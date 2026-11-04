@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useApp } from '../store';
 import { useResource } from '../lib/resource';
 import { useScope } from '../lib/scope';
+import { SOURCE, SUBJECT_TYPE, stateMeta } from '../api/enums';
 
 export const Icon = ({ name, size = 18, className = '', fill = false }) => (
   <span className={`ms ${className}`} style={{ fontSize: size, fontVariationSettings: fill ? "'FILL' 1" : undefined }} aria-hidden>
@@ -254,10 +255,11 @@ export function Drawer({ open, onClose, children, width = 480 }) {
 }
 
 /** Modal xác nhận có trường lý do bắt buộc — mọi thao tác nhạy cảm đều ghi log. */
-export function ConfirmReason({ open, onClose, onConfirm, title, subtitle, danger, confirmLabel = 'Xác nhận', children, minLength = 10 }) {
+export function ConfirmReason({ open, onClose, onConfirm, title, subtitle, danger, confirmLabel = 'Xác nhận', children, minLength = 10, reasonLabel = 'Lý do / Ghi chú kiểm toán', placeholder = 'Nhập căn cứ cho thao tác này…' }) {
   const [reason, setReason] = useState('');
-  useEffect(() => { if (open) setReason(''); }, [open]);
-  const ok = reason.trim().length >= minLength;
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { if (open) { setReason(''); setBusy(false); } }, [open]);
+  const ok = reason.trim().length >= minLength && !busy;
   return (
     <Modal open={open} onClose={onClose} width="max-w-lg">
       <div className="p-space-md border-b border-border-subtle flex items-center gap-2.5">
@@ -272,17 +274,17 @@ export function ConfirmReason({ open, onClose, onConfirm, title, subtitle, dange
         {children}
         <label className="flex flex-col gap-1.5">
           <span className="text-label-md font-semibold flex justify-between">
-            <span>Lý do / Ghi chú kiểm toán <span className="text-status-rejected">*</span></span>
+            <span>{reasonLabel} <span className="text-status-rejected">*</span></span>
             <span className="text-caption text-text-secondary font-normal">Tối thiểu {minLength} ký tự</span>
           </span>
-          <textarea className="input leading-relaxed" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Nhập căn cứ cho thao tác này…" autoFocus />
+          <textarea className="input leading-relaxed" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={placeholder} autoFocus />
         </label>
       </div>
       <div className="p-space-md bg-surface-bright border-t border-border-subtle flex items-center justify-between">
         <span className="flex items-center gap-1.5 text-caption text-text-secondary"><Icon name="lock" size={16} className="text-ai-border" />Thao tác sẽ được ký số và ghi log</span>
         <div className="flex gap-2">
           <button className="btn-outline" onClick={onClose}>Hủy</button>
-          <button disabled={!ok} className={`btn ${danger ? 'bg-status-rejected text-white hover:bg-red-700' : 'bg-primary-container text-white hover:bg-primary'} disabled:cursor-not-allowed`} onClick={() => onConfirm(reason.trim())}>
+          <button disabled={!ok} className={`btn ${danger ? 'bg-status-rejected text-white hover:bg-red-700' : 'bg-primary-container text-white hover:bg-primary'} disabled:cursor-not-allowed`} onClick={async () => { setBusy(true); try { await onConfirm(reason.trim()); } finally { setBusy(false); } }}>
             <Icon name="check" />{confirmLabel}
           </button>
         </div>
@@ -436,17 +438,85 @@ const SCOPE_NOTE = {
   units: 'Trang này lọc theo đơn vị, chưa tách theo đối tượng.',
 };
 
-/** Bao nội dung một trang: xử lý trạng thái đang tải, lỗi và phạm vi chưa có dữ liệu. */
-export function DataBoundary({ name, label, fill = false, scopeNote, children }) {
+export const Bone = ({ className = '' }) => <div className={`skeleton ${className}`} />;
+
+/** Cùng kích thước với MetricStrip để trang không nhảy khi dữ liệu về. */
+export const MetricsSkeleton = ({ count = 4, subLines = 1 }) => (
+  <div className="card grid divide-x divide-border-subtle overflow-hidden mb-space-md shrink-0" style={{ gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))` }}>
+    {Array.from({ length: count }, (_, i) => (
+      <div key={i} className="px-space-md py-3">
+        <Bone className="h-4 my-0.5 w-3/5" />
+        <Bone className="h-7 mt-1.5 mb-1 w-24" />
+        <Bone className="h-3 mt-1.5 mb-0.5 w-4/5" />
+        {subLines > 1 && <Bone className="h-3 mt-1.5 mb-0.5 w-1/2" />}
+      </div>
+    ))}
+  </div>
+);
+
+const TableSkeleton = ({ rows = 8, fill }) => (
+  <div className={`card overflow-hidden ${fill ? 'flex-1 min-h-0' : ''}`}>
+    <div className="h-11 px-space-md flex items-center gap-5 border-b border-border-subtle">
+      {['w-20', 'w-24', 'w-16'].map((w) => <Bone key={w} className={`h-4 ${w}`} />)}
+    </div>
+    <div className="h-10 px-3 grid grid-cols-[2fr_1fr_1fr_1fr_1fr] items-center gap-4 bg-surface-container-low border-b border-border-subtle">
+      {[0, 1, 2, 3, 4].map((c) => <Bone key={c} className="h-3 w-16" />)}
+    </div>
+    {Array.from({ length: rows }, (_, r) => (
+      <div key={r} className="h-14 px-3 grid grid-cols-[2fr_1fr_1fr_1fr_1fr] items-center gap-4 border-b border-border-subtle last:border-0">
+        <div><Bone className="h-4 w-3/5" /><Bone className="h-3 w-2/5 mt-1.5" /></div>
+        {[0, 1, 2, 3].map((c) => <Bone key={c} className={`h-4 ${['w-4/5', 'w-3/5', 'w-2/3', 'w-1/2'][(r + c) % 4]}`} />)}
+      </div>
+    ))}
+  </div>
+);
+
+const SplitSkeleton = ({ fill }) => (
+  <div className={`grid grid-cols-[400px_minmax(0,1fr)] gap-space-md ${fill ? 'flex-1 min-h-0' : ''}`}>
+    <div className="card overflow-hidden divide-y divide-border-subtle">
+      {Array.from({ length: fill ? 9 : 7 }, (_, r) => (
+        <div key={r} className="px-3.5 py-3">
+          <Bone className={`h-4 ${r % 2 ? 'w-3/5' : 'w-3/4'}`} />
+          <Bone className="h-3 w-2/5 mt-2" />
+        </div>
+      ))}
+    </div>
+    <div className="card overflow-hidden p-space-md flex flex-col gap-3">
+      <Bone className="h-6 w-2/5" />
+      <Bone className="h-3 w-1/4" />
+      <Bone className="h-24 mt-2" />
+      <Bone className="h-4 w-1/3 mt-2" />
+      <Bone className="h-10" />
+      <Bone className="h-10" />
+      <Bone className="h-4 w-1/4 mt-2" />
+      <Bone className="h-10" />
+    </div>
+  </div>
+);
+
+const SKELETONS = {
+  table: (fill) => <TableSkeleton fill={fill} />,
+  'metrics-table': (fill) => <><MetricsSkeleton /><TableSkeleton fill={fill} rows={6} /></>,
+  split: (fill) => <SplitSkeleton fill={fill} />,
+  'bar-split': (fill) => <><Bone className="h-[46px] rounded-lg mb-space-md shrink-0" /><SplitSkeleton fill={fill} /></>,
+  'metrics-split': (fill) => <><MetricsSkeleton /><SplitSkeleton fill={fill} /></>,
+};
+
+/**
+ * Bao nội dung một trang: xử lý trạng thái đang tải, lỗi và phạm vi chưa có dữ liệu.
+ * skeleton: khung tải giống bố cục trang, là tên trong SKELETONS hoặc một phần tử React.
+ * reveal: các khối con hiện lần lượt; tắt khi trang tự sắp hiệu ứng.
+ */
+export function DataBoundary({ name, label, fill = false, scopeNote, skeleton = 'table', reveal = true, children }) {
   const { status, reload } = useResource(name);
   const { scope, primaryTenant, allUnits, allSubjects } = useScope();
   const box = `card ${fill ? 'flex-1 min-h-0' : ''}`;
   if (!primaryTenant) return <div className={box}><Empty icon="domain_disabled" title={`${scope.tenant} chưa có dữ liệu`} desc="Đơn vị này chưa được kết nối vào hệ thống. Đổi phạm vi ở thanh trên cùng để xem đơn vị khác." /></div>;
   if (status === 'loading') {
     return (
-      <div className={`${box} p-space-md flex flex-col gap-3 overflow-hidden`} role="status" aria-busy="true">
+      <div className={fill ? 'flex-1 min-h-0 flex flex-col' : ''} role="status" aria-busy="true">
         <span className="sr-only">Đang tải {label}…</span>
-        {[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="h-10 rounded bg-surface-container animate-pulse" />)}
+        {typeof skeleton === 'string' ? SKELETONS[skeleton](fill) : skeleton}
       </div>
     );
   }
@@ -464,10 +534,10 @@ export function DataBoundary({ name, label, fill = false, scopeNote, children })
   }
   const showNote = scopeNote === 'global' ? !allUnits || !allSubjects : scopeNote === 'units' && !allSubjects;
   return (
-    <>
+    <div className={reveal ? 'contents reveal' : 'contents'}>
       {showNote && <p className="mb-2 text-caption text-text-secondary flex items-center gap-1.5 shrink-0"><Icon name="info" size={14} />{SCOPE_NOTE[scopeNote]}</p>}
       {children}
-    </>
+    </div>
   );
 }
 
@@ -478,3 +548,82 @@ export const Empty = ({ icon = 'inbox', title, desc }) => (
     {desc && <div className="text-caption mt-0.5">{desc}</div>}
   </div>
 );
+
+/** Một chiều trạng thái của hồ sơ, ví dụ <StateBadge dim="validity" value="LOCKED" />. */
+export const StateBadge = ({ dim, value, label }) => {
+  const m = stateMeta(dim, value);
+  return <StatusDot color={m.color} label={label || m.label} />;
+};
+
+/** Badge nguồn Face ID: App MyDaiNam, Ảnh thẻ CSDL, Đăng ký tại quầy. */
+export const SourceBadge = ({ source, poses }) => {
+  if (!source) return <span className="text-caption text-text-secondary">Chưa có</span>;
+  const m = SOURCE[source];
+  return (
+    <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded border border-border-subtle bg-surface text-caption whitespace-nowrap" title={m.label}>
+      <Icon name={m.icon} size={14} className="text-primary-container" />
+      <span className="font-medium">{m.short}</span>
+      {poses != null && source !== 'CARD_DB' && <span className="text-text-secondary">• {poses} tư thế</span>}
+    </span>
+  );
+};
+
+export const SubjectTypeChip = ({ type, className = '' }) => {
+  const m = SUBJECT_TYPE[type];
+  return <Chip color={m.chip} icon={m.icon} className={className}>{m.label}</Chip>;
+};
+
+/** Ô chọn nhiều bằng checkbox dạng chip. options: [{ value, label, hint }] */
+export function ChipToggleGroup({ options, value, onChange, label, invalid }) {
+  const toggle = (v) => onChange(value.includes(v) ? value.filter((x) => x !== v) : [...value, v]);
+  return (
+    <div role="group" aria-label={label} className="flex flex-wrap gap-2">
+      {options.map((o) => {
+        const on = value.includes(o.value);
+        return (
+          <button key={o.value} type="button" aria-pressed={on} onClick={() => toggle(o.value)} disabled={o.disabled} title={o.hint}
+            className={`min-h-[40px] px-3 rounded border text-body-sm flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${on ? 'border-primary-container bg-primary-fixed text-primary-container font-medium' : `${invalid ? 'border-status-rejected' : 'border-border-control'} bg-surface hover:bg-surface-container-low`}`}>
+            <Icon name={on ? 'check_box' : 'check_box_outline_blank'} size={18} />
+            {o.icon && <Icon name={o.icon} size={16} />}
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Dòng lỗi kiểm tra dưới ô nhập. */
+export const FieldError = ({ msg, id }) => (msg ? <p id={id} role="alert" className="mt-1 text-caption text-status-rejected flex items-start gap-1"><Icon name="error" size={14} className="mt-0.5" />{msg}</p> : null);
+
+/** Công tắc bật/tắt. */
+export const Switch = ({ checked, onChange, label, disabled }) => (
+  <button type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled} onClick={() => onChange(!checked)}
+    className={`w-11 h-6 rounded-full relative transition-colors shrink-0 disabled:opacity-50 ${checked ? 'bg-status-active' : 'bg-border-control'}`}>
+    <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${checked ? 'left-[22px]' : 'left-0.5'}`} />
+  </button>
+);
+
+/** Đếm ngược tới thời điểm until (ms); hết giờ gọi onEnd. Trả về số giây còn lại. */
+export function useCountdown(until, onEnd) {
+  const [left, setLeft] = useState(0);
+  const end = useRef(onEnd);
+  end.current = onEnd;
+  useEffect(() => {
+    if (!until) { setLeft(0); return undefined; }
+    const tick = () => { const l = Math.max(0, Math.ceil((until - Date.now()) / 1000)); setLeft(l); if (l === 0) end.current?.(); };
+    tick();
+    const t = setInterval(tick, 500);
+    return () => clearInterval(t);
+  }, [until]);
+  return left;
+}
+
+/** Quyền theo vai trò: hiển thị thông báo thay cho trang khi không đủ quyền. */
+export function RequirePerm({ perm, children }) {
+  const { can, actor } = useApp();
+  if (can(perm)) return children;
+  return (
+    <div className="card"><Empty icon="lock" title="Vai trò hiện tại không được xem trang này" desc={`${actor.name} chưa được cấp quyền. Đổi vai trò ở góc trên bên phải để mô phỏng tài khoản khác.`} /></div>
+  );
+}

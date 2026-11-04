@@ -25,6 +25,7 @@
   .data-table th { @apply h-10 px-3 bg-surface-container-low text-label-sm text-text-secondary whitespace-nowrap border-b border-border-subtle; }
   .data-table td { @apply px-3 py-2 border-b border-border-subtle; }
   .data-table tbody tr:last-child td { border-bottom: 0; }
+  .skeleton { @apply rounded bg-surface-container; background-image: linear-gradient(90deg, transparent 30%, theme('colors.surface-container-low') 50%, transparent 70%); background-size: 200% 100%; background-attachment: fixed; animation: shimmer 1.4s linear infinite; }
   .ms { overflow: hidden; width: 1em; height: 1em; flex-shrink: 0; font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; direction: ltr; -webkit-font-feature-settings: 'liga'; font-feature-settings: 'liga'; }
 }
 
@@ -34,9 +35,20 @@
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @keyframes slideIn { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@keyframes growX { from { transform: scaleX(0); } to { transform: none; } }
+@keyframes loaderSlide { from { transform: translateX(-100%); } to { transform: translateX(350%); } }
 .anim-fade { animation: fadeIn .18s ease-out; }
 .anim-slide { animation: slideIn .22s ease-out; }
+.anim-page { animation: fadeIn .2s ease-out; }
+.anim-grow { transform-origin: left; animation: growX .6s cubic-bezier(.2, .7, .2, 1); }
+.top-loader { animation: loaderSlide 1s ease-in-out infinite; }
+/* Các khối hiện lần lượt khi dữ liệu tải xong. */
+.reveal > * { animation: fadeIn .28s ease-out backwards; }
+.reveal > :nth-child(2) { animation-delay: 60ms; }
+.reveal > :nth-child(3) { animation-delay: 120ms; }
+.reveal > :nth-child(n+4) { animation-delay: 180ms; }
 
 @media (prefers-reduced-motion: reduce) {
-  *, ::before, ::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  *, ::before, ::after { animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }

@@ -2,33 +2,39 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Icon, Select } from './ui';
 import { useApp } from '../store';
-import { CURRENT_USER, TENANTS, ORG_UNITS, SUBJECT_TYPES } from '../data/mock';
+import { useResourceLoading } from '../lib/resource';
+import { TENANT_OPTIONS, UNIT_OPTIONS, SUBJECT_OPTIONS } from '../lib/scope';
+import { ROLES } from '../api/enums';
 import logo from '../assets/logo-dnu.svg';
 import logoMark from '../assets/logo-dnu-mark.svg';
 
+// perm: quyền cần có để thấy mục menu (xem ROLES trong api/enums.js).
 const NAV = [
   { group: 'Vận hành', items: [
-    { to: '/', icon: 'dashboard', label: 'Tổng quan', end: true },
-    { to: '/ho-so', icon: 'face', label: 'Hồ sơ Face ID' },
-    { to: '/yeu-cau', icon: 'move_to_inbox', label: 'Hộp yêu cầu', badge: 'requests' },
-    { to: '/dong-y', icon: 'verified_user', label: 'Đồng ý (NĐ 13)' },
+    { to: '/', icon: 'dashboard', label: 'Tổng quan', end: true, perm: 'view' },
+    { to: '/ho-so', icon: 'face', label: 'Hồ sơ định danh', perm: 'view' },
+    { to: '/yeu-cau', icon: 'move_to_inbox', label: 'Hộp yêu cầu', badge: 'requests', perm: 'view' },
+    { to: '/dong-y', icon: 'verified_user', label: 'Đồng ý & bảo mật', perm: 'consent' },
   ]},
   { group: 'Cấu hình', items: [
-    { to: '/khong-gian', icon: 'account_tree', label: 'Không gian & khu vực' },
-    { to: '/thiet-bi', icon: 'videocam', label: 'Thiết bị' },
-    { to: '/thoi-khoa-bieu', icon: 'calendar_month', label: 'Lịch học & điểm danh' },
-    { to: '/chinh-sach', icon: 'policy', label: 'Quy tắc & chính sách' },
+    { to: '/chinh-sach', icon: 'policy', label: 'Chính sách & quy tắc', perm: 'view' },
+    { to: '/khong-gian', icon: 'account_tree', label: 'Không gian & khu vực', perm: 'view' },
+    { to: '/thiet-bi', icon: 'videocam', label: 'Thiết bị', perm: 'view' },
+    { to: '/tich-hop', icon: 'hub', label: 'Nguồn dữ liệu & tích hợp', badge: 'sources', perm: 'view' },
+    { to: '/thoi-khoa-bieu', icon: 'calendar_month', label: 'Lịch học & điểm danh', perm: 'view' },
   ]},
   { group: 'Giám sát', items: [
-    { to: '/soc', icon: 'shield_lock', label: 'An ninh & ngoại lệ', badge: 'soc' },
-    { to: '/giam-sat-ai', icon: 'smart_toy', label: 'Giám sát AI' },
-    { to: '/nhat-ky', icon: 'receipt_long', label: 'Nhật ký & Báo cáo' },
+    { to: '/soc', icon: 'shield_lock', label: 'An ninh & ngoại lệ', badge: 'soc', perm: 'security' },
+    { to: '/giam-sat-ai', icon: 'smart_toy', label: 'Giám sát AI', perm: 'view' },
+    { to: '/nhat-ky', icon: 'receipt_long', label: 'Kiểm toán & báo cáo', perm: 'audit' },
   ]},
 ];
 
 function Sidebar() {
-  const { requests, railCollapsed: collapsed, toggleRail } = useApp();
+  const { requests, data, railCollapsed: collapsed, toggleRail, can } = useApp();
   const pending = requests.filter((r) => r.status === 'pending').length;
+  const sourceIssue = data.sources.some((x) => x.status === 'ERROR');
+  const groups = NAV.map((g) => ({ ...g, items: g.items.filter((it) => can(it.perm) || can('*')) })).filter((g) => g.items.length);
   const shape = `relative flex items-center h-9 rounded text-label-md transition-colors focus-visible:outline-white ${collapsed ? 'justify-center' : 'gap-2.5 px-2.5'}`;
   const toggleLabel = collapsed ? 'Mở rộng menu' : 'Thu gọn menu';
   return (
@@ -45,7 +51,7 @@ function Sidebar() {
         </div>
       )}
       <nav className="flex-1 px-space-sm overflow-y-auto overflow-x-hidden py-2">
-        {NAV.map((g, i) => (
+        {groups.map((g, i) => (
           <div key={g.group} className="mb-3">
             {collapsed && i > 0 && <div className="mx-1 mb-3 border-t border-rail-line" />}
             <div className={collapsed ? 'sr-only' : 'px-2.5 pt-1 pb-1 text-caption text-rail-muted whitespace-nowrap'}>{g.group}</div>
@@ -55,6 +61,7 @@ function Sidebar() {
                 <Icon name={it.icon} size={18} />
                 <span className={collapsed ? 'sr-only' : 'truncate'}>{it.label}</span>
                 {it.badge === 'requests' && pending > 0 && <span className={`${collapsed ? 'absolute top-0 right-0.5 min-w-[16px] h-4 px-0.5' : 'ml-auto min-w-[20px] h-5 px-1'} rounded bg-accent text-on-accent text-caption font-semibold flex items-center justify-center`} aria-label={`${pending} yêu cầu chờ duyệt`}>{pending}</span>}
+                {it.badge === 'sources' && sourceIssue && <span className={`${collapsed ? 'absolute top-1.5 right-2' : 'ml-auto'} w-2 h-2 rounded-full bg-rail-alert`} role="img" aria-label="Có nguồn dữ liệu lỗi đồng bộ" />}
                 {it.badge === 'soc' && <span className={`${collapsed ? 'absolute top-1.5 right-2' : 'ml-auto'} w-2 h-2 rounded-full bg-rail-alert`} role="img" aria-label="Có sự kiện chưa xử lý" />}
               </NavLink>
             ))}
@@ -111,7 +118,7 @@ function Notifications({ onClose }) {
         {list.length === 0 && <div className="p-6 text-center text-caption text-text-secondary">Không có thông báo</div>}
         {list.map((n) => (
           <button key={n.id} className={`w-full text-left p-3 flex gap-2.5 hover:bg-surface-container-low ${n.unread ? 'bg-surface-container-low/50' : 'opacity-75'}`}
-            onClick={() => { setNotifications((ns) => ns.map((x) => (x.id === n.id ? { ...x, unread: false } : x))); onClose(); nav(n.alert ? '/soc' : '/yeu-cau'); }}>
+            onClick={() => { setNotifications((ns) => ns.map((x) => (x.id === n.id ? { ...x, unread: false } : x))); onClose(); nav(n.to || '/yeu-cau'); }}>
             <span className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${n.unread ? `bg-${n.color}` : 'bg-transparent'}`} />
             <div className="flex-1 min-w-0">
               <div className="flex justify-between gap-1"><span className={`text-label-md font-semibold ${n.alert ? 'text-status-rejected' : ''}`}>{n.title}</span><span className="text-caption text-text-secondary shrink-0">{n.time}</span></div>
@@ -125,7 +132,7 @@ function Notifications({ onClose }) {
 }
 
 function TopBar() {
-  const { scope, setScope, notifications, toast, railCollapsed } = useApp();
+  const { scope, setScope, notifications, toast, railCollapsed, role, setRole, actor } = useApp();
   const { pathname } = useLocation();
   const onDashboard = pathname === '/';
   const [open, setOpen] = useState(false);
@@ -140,11 +147,11 @@ function TopBar() {
     <header className={`fixed top-0 ${railCollapsed ? 'left-16' : 'left-[240px]'} right-0 h-14 bg-surface z-30 border-b border-border-subtle flex items-center justify-between px-space-lg gap-3 transition-[left] duration-200`}>
       {onDashboard && (
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
-          <Select variant="inline" label="Đơn vị chủ quản" value={scope.tenant} options={TENANTS} onChange={(v) => setScope((s) => ({ ...s, tenant: v }))} />
+          <Select variant="inline" label="Đơn vị chủ quản" value={scope.tenant} options={TENANT_OPTIONS} onChange={(v) => setScope((s) => ({ ...s, tenant: v }))} />
           <span className="text-border-strong" aria-hidden>/</span>
-          <Select variant="inline" label="Khoa / Phòng ban" value={scope.unit} options={ORG_UNITS} onChange={(v) => setScope((s) => ({ ...s, unit: v }))} />
+          <Select variant="inline" label="Khoa / Phòng ban" value={scope.unit} options={UNIT_OPTIONS} onChange={(v) => setScope((s) => ({ ...s, unit: v }))} />
           <span className="text-border-strong" aria-hidden>/</span>
-          <Select variant="inline" label="Đối tượng" value={scope.subject} options={SUBJECT_TYPES} onChange={(v) => setScope((s) => ({ ...s, subject: v }))} />
+          <Select variant="inline" label="Đối tượng" value={scope.subject} options={SUBJECT_OPTIONS} onChange={(v) => setScope((s) => ({ ...s, subject: v }))} />
           <form className="flex-1 min-w-[200px] max-w-sm ml-3" onSubmit={(e) => { e.preventDefault(); const q = new FormData(e.target).get('q'); if (q) toast('Trợ lý tra cứu', `Đang tìm: “${q}” trong phạm vi ${scope.tenant}`); }}>
             <div className="h-8 flex items-center gap-2 border border-border-control rounded px-2.5 bg-surface focus-within:border-primary-container focus-within:ring-1 focus-within:ring-primary-container">
               <Icon name="search" size={16} className="text-text-secondary" />
@@ -168,12 +175,22 @@ function TopBar() {
           </>
         )}
         <div className="flex items-center gap-2.5">
-          <div className="text-right"><div className="text-label-md font-medium leading-none">{CURRENT_USER.name}</div><div className="text-caption text-text-secondary mt-0.5">{CURRENT_USER.role}</div></div>
-          <div className="w-8 h-8 rounded bg-surface-container flex items-center justify-center text-label-sm font-semibold" aria-hidden>{CURRENT_USER.name.split(' ').slice(-2).map((w) => w[0]).join('')}</div>
+          <div className="text-right">
+            <div className="text-label-md font-medium leading-none">{actor.name}</div>
+            <Select variant="inline" className="!h-6 !px-1 -mr-1 text-caption !font-normal text-text-secondary" label="Vai trò đăng nhập (mô phỏng)" value={role} onChange={(r) => { setRole(r); toast('Đã đổi tài khoản', `Đăng nhập với vai trò ${ROLES[r].label}. Menu và quyền thao tác thay đổi theo vai trò.`); }}
+              options={Object.entries(ROLES).map(([value, m]) => ({ value, label: m.label }))} />
+          </div>
+          <div className="w-8 h-8 rounded bg-surface-container flex items-center justify-center text-label-sm font-semibold" aria-hidden>{actor.name.split(' ').slice(-2).map((w) => w[0]).join('')}</div>
         </div>
       </div>
     </header>
   );
+}
+
+function TopLoader() {
+  const loading = useResourceLoading();
+  if (!loading) return null;
+  return <div className="fixed top-0 inset-x-0 h-0.5 z-[45] overflow-hidden" aria-hidden><div className="top-loader h-full w-2/5 bg-accent" /></div>;
 }
 
 export default function Layout() {
@@ -190,10 +207,11 @@ export default function Layout() {
   return (
     <div className="min-h-screen">
       <button className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[90] btn-primary" onClick={() => main.current.focus()}>Bỏ qua menu, đến nội dung chính</button>
+      <TopLoader />
       <Sidebar />
       <TopBar />
       <main ref={main} tabIndex={-1} className={`${railCollapsed ? 'pl-16' : 'pl-[240px]'} pt-14 outline-none transition-[padding] duration-200`}>
-        <div className="mx-auto max-w-[1680px] px-space-lg py-space-md"><Outlet /></div>
+        <div key={pathname} className="anim-page mx-auto max-w-[1680px] px-space-lg py-space-md"><Outlet /></div>
       </main>
     </div>
   );

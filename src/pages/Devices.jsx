@@ -31,7 +31,7 @@ export default function Devices() {
           <button className="btn-primary" onClick={() => toast('Khai báo thiết bị', 'Thiết bị mới cần được gán vào phòng đã duyệt hạ tầng.')}><Icon name="add" />Khai báo thiết bị</button>
         </>} />
 
-      <DataBoundary name="devices" label="danh sách thiết bị" fill scopeNote="global">
+      <DataBoundary name="devices" label="danh sách thiết bị" fill scopeNote="global" skeleton="metrics-table">
       <MetricStrip className="mb-space-md shrink-0" items={[
         { label: 'Tổng thiết bị', value: devices.length, sub: `${kinds.length - 1} loại thiết bị` },
         { label: 'Trực tuyến', value: online, sub: `${Math.round((online / devices.length) * 100)}% tổng số` },

@@ -1,33 +1,41 @@
 import { useLocation } from 'react-router-dom';
 import { useApp } from '../store';
-import { ORG_UNITS, SUBJECT_TYPES, TENANTS } from '../data/mock';
+import { ORG_TREE, TENANT } from '../api/db';
+import { SUBJECT_TYPE } from '../api/enums';
 
-// Dữ liệu mẫu ghi tên đơn vị không thống nhất, nên đối chiếu theo mẫu. Khi có API sẽ lọc theo mã đơn vị.
-const UNIT_PATTERN = {
-  'Khoa Công nghệ Thông tin': /CNTT|Công nghệ Thông tin/,
-  'Khoa Kinh tế & QTKD': /Kinh tế|QTKD/,
-  'Khoa Điện - Điện tử': /Điện/,
-  'Phòng Đào tạo': /^Phòng Đào tạo/,
-  'Ban Quản lý KTX': /KTX/,
+const leaves = (nodes) => nodes.flatMap((n) => (n.children ? leaves(n.children) : [n]));
+
+export const TENANT_OPTIONS = [{ value: TENANT, label: TENANT }, { value: 'CS2', label: 'Phân hiệu Cơ sở II' }];
+export const UNIT_OPTIONS = [{ value: 'ALL', label: 'Tất cả khoa, phòng ban' }, ...leaves(ORG_TREE[0].children).map((n) => ({ value: n.id, label: n.name }))];
+export const SUBJECT_OPTIONS = [{ value: 'ALL', label: 'Mọi đối tượng' }, ...Object.entries(SUBJECT_TYPE).map(([value, m]) => ({ value, label: m.label }))];
+
+/** Tên đơn vị theo mã, kể cả nút cha trong cây tổ chức. */
+const ALL_NODES = (function flat(nodes) { return nodes.flatMap((n) => [n, ...(n.children ? flat(n.children) : [])]); })(ORG_TREE);
+export const unitName = (id) => ALL_NODES.find((n) => n.id === id)?.name || id;
+
+/** Mã đơn vị và tất cả đơn vị con của nó. */
+export const unitWithChildren = (id) => {
+  const node = ALL_NODES.find((n) => n.id === id);
+  return node ? [node.id, ...(node.children ? leaves(node.children).map((n) => n.id) : [])] : [id];
 };
-const SUBJECT_BY_PREFIX = { SV: 'Sinh viên', GV: 'Giảng viên', NV: 'Cán bộ', EXT: 'NV thuê ngoài', KTX: 'Cư dân KTX' };
 
-const ALL_SCOPE = { tenant: TENANTS[0], unit: ORG_UNITS[0], subject: SUBJECT_TYPES[0] };
+const ALL_SCOPE = { tenant: TENANT, unit: 'ALL', subject: 'ALL' };
 
 // Thanh chọn phạm vi chỉ có ở Tổng quan, nên các trang khác luôn hiển thị toàn bộ dữ liệu.
 export function useScope() {
   const { scope: selected } = useApp();
   const { pathname } = useLocation();
   const scope = pathname === '/' ? selected : ALL_SCOPE;
-  const allUnits = scope.unit === ORG_UNITS[0];
-  const allSubjects = scope.subject === SUBJECT_TYPES[0];
+  const allUnits = scope.unit === 'ALL';
+  const allSubjects = scope.subject === 'ALL';
   return {
     scope,
     allUnits,
     allSubjects,
-    primaryTenant: scope.tenant === TENANTS[0],
+    primaryTenant: scope.tenant === TENANT,
     narrowed: !allUnits || !allSubjects,
-    matchUnit: (text) => allUnits || UNIT_PATTERN[scope.unit].test(text || ''),
-    matchSubject: (id) => allSubjects || SUBJECT_BY_PREFIX[(id || '').split('-')[0]] === scope.subject,
+    unitLabel: UNIT_OPTIONS.find((o) => o.value === scope.unit)?.label,
+    matchUnit: (orgUnit) => allUnits || orgUnit === scope.unit,
+    matchSubject: (type) => allSubjects || type === scope.subject,
   };
 }

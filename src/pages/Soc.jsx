@@ -26,7 +26,7 @@ export default function Soc() {
       <PageHeader title="An ninh & ngoại lệ" desc="Sự kiện an ninh theo thời gian thực, ngoại lệ dạy thay và khiếu nại điểm danh. Khuôn mặt luôn được làm mờ."
         badge={openCritical > 0 && <Chip color="status-rejected" icon="error">{openCritical} sự cố nghiêm trọng</Chip>} />
 
-      <DataBoundary name="events" label="sự kiện an ninh" fill scopeNote="global">
+      <DataBoundary name="events" label="sự kiện an ninh" fill scopeNote="global" skeleton="metrics-split">
       <MetricStrip className="mb-space-md shrink-0" items={[
         { label: 'Thời gian phát cảnh báo', value: '1,6 giây', sub: 'Mục tiêu tối đa 2 giây' },
         { label: 'Sự kiện 24 giờ qua', value: fmtNumber(1284), sub: '98% tự động đóng' },

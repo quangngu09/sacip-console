@@ -10,20 +10,47 @@ npm run dev        # http://localhost:5173
 Build: `npm run build` (thư mục `dist/`), hoặc `npm run build:single` để ra 1 file HTML duy nhất (`dist-single/index.html`).
 
 ## Các màn hình
-| Route | Màn hình | Nguồn |
+| Route | Màn hình | Nguồn yêu cầu |
 |---|---|---|
-| `#/` | Tổng quan: việc cần xử lý, điểm danh, lịch học hôm nay | Blueprint — luồng dữ liệu |
-| `#/ho-so` | Hồ sơ Face ID + drawer chi tiết | Stitch |
-| `#/yeu-cau` | Hộp yêu cầu, modal phê duyệt, rút đồng ý NĐ 13, xác nhận 2 người | Stitch |
-| `#/dong-y` | Quản lý đồng ý | Blueprint |
-| `#/khong-gian` | Không gian & khu vực, map Camera_ID → Room_ID, nguyên tắc "Hạ tầng đi trước" | Blueprint §0, §4.1 |
-| `#/thiet-bi` | Thiết bị, NTP, Online/Offline | Blueprint §3, §4.3 |
-| `#/thoi-khoa-bieu` | Lịch học & điểm danh (EMS), Workflow A & B | Blueprint §2 |
-| `#/chinh-sach` | Quy tắc & chính sách (PDP) có Dry-Run | Blueprint §4.2 |
-| `#/soc` | An ninh & ngoại lệ (Dạy thay, khiếu nại) | Blueprint §4.4 |
-| `#/giam-sat-ai` | Giám sát mô hình AI | Blueprint Gói 3 |
-| `#/nhat-ky` | Immutable audit log (cập nhật theo thao tác thật trong app) | DESIGN.md |
-| `#/kiosk` | Kiosk trạm chụp (Space / F2 / F4 / Esc) | Stitch kiosk |
+| `#/` | Tổng quan: tỷ lệ phủ xem chi tiết theo khoa/khóa/nhà thầu/KTX, hàng chờ, cảnh báo lệch chuẩn và gian lận | Đặc tả IAM §2.1 |
+| `#/ho-so` | Hồ sơ định danh: một bảng cho mọi loại đối tượng, 5 cột trạng thái, chặn thao tác khi chưa có đồng ý, xem ảnh gốc qua link 60 giây, tra soát Wi-Fi/beacon | Đặc tả IAM §2.2 |
+| `#/yeu-cau` | Hộp yêu cầu chung (REQ-xxxx), chuỗi duyệt lấy từ chính sách, từ chối bắt buộc lý do, thu hồi 2 người, AI tự duyệt | Đặc tả IAM §2.3 |
+| `#/dong-y` | Đồng ý & bảo mật: phiên bản điều khoản, tỷ lệ đồng ý, quyền được lãng quên | Đặc tả IAM §2.5 |
+| `#/chinh-sach` | Chính sách sinh trắc (lịch sử phiên bản, khôi phục) và Quy tắc sự kiện | Đặc tả Policy Engine, Blueprint §4.2 |
+| `#/chinh-sach/:id/sua` | Wizard 4 bước + xem lại, kiểm tra lỗi trực tiếp, chạy thử, lưu thành phiên bản mới | Đặc tả Policy Engine §2, §4 |
+| `#/tich-hop` | Nguồn dữ liệu đầu vào và sự kiện gửi đi (Kafka / webhook) | Đặc tả Policy Engine §1, §3 |
+| `#/khong-gian`, `#/thiet-bi`, `#/thoi-khoa-bieu`, `#/soc`, `#/giam-sat-ai` | Như trước | Blueprint |
+| `#/nhat-ky` | Kiểm toán: chỉ số, chuỗi băm bất biến, kiểm tra toàn vẹn, xuất kèm mã băm | Đặc tả IAM §2.6 |
+| `#/kiosk` | Kiosk: số tư thế theo chính sách, ký đồng ý tại quầy, AI tự duyệt hoặc chuyển người duyệt | Đặc tả Policy Engine bước 3 |
+
+## Vai trò (mô phỏng đăng nhập)
+Đổi ở góc trên bên phải. Menu và nút thao tác thay đổi theo quyền trong `src/api/enums.js` (`ROLES`).
+
+| Vai trò | Được làm |
+|---|---|
+| Quản trị hệ thống | Mọi thứ, kể cả sửa chính sách |
+| Kiểm toán viên trưởng | Xem, kiểm toán, xem ảnh gốc, đồng ý |
+| Cán bộ Phòng Đào tạo (mặc định) | Xem, duyệt yêu cầu, sửa hồ sơ, xem ảnh gốc, đồng ý |
+| Trực an ninh | Xem, trang An ninh, khóa hồ sơ |
+
+Thu hồi cần 2 người khác nhau: xác nhận lần 1 bằng một vai trò, đổi vai trò, rồi xác nhận lần 2.
+
+## Dữ liệu giả lập (API)
+- `src/api/db.js`: dữ liệu mẫu theo đúng schema trong đặc tả (`subject_id`, `subject_type`, `consent_status`, `bssid_metadata`, `request_id`, `rules_config`, `action_code`, `immutable_hash`…).
+- `src/api/client.js`: mỗi hàm async là một endpoint (đường dẫn REST ghi ở chú thích đầu hàm). Khi có backend, thay thân hàm bằng `fetch()`; giữ nguyên tên và dạng dữ liệu trả về thì các trang không phải sửa.
+- `src/api/policyValidation.js`: kiểm tra cấu hình chính sách, dùng chung cho giao diện và khi lưu.
+- `src/api/enums.js`: mã và nhãn tiếng Việt cho loại đối tượng, nguồn, 5 chiều trạng thái, loại yêu cầu, action_code, vai trò.
+- Dữ liệu chỉ nằm trong bộ nhớ trình duyệt: tải lại trang là về trạng thái ban đầu.
+
+Endpoint đang giả lập: `GET /bootstrap`, `POST /subjects/{id}/original-image-url`, `POST /subjects/{id}/lock|unlock|activate`, `POST /subjects/bulk`, `POST /requests`, `POST /requests/{id}/approve|reject|cancel`, `POST /policies/{id}/versions`, `POST /policies/{id}/rollback`, `POST /policies/{id}/dry-run`, `POST /consents/reconfirm`, `POST /subjects/{id}/consent`, `POST /erasures/{id}/advance`, `POST /sources/{id}/sync`, `POST /events/{id}/retry`, `GET /audit/verify`, `POST /audit/export`, `POST /kiosk/enroll`.
+
+## Quyết định thiết kế khi hai tài liệu khác nhau
+- AI được tự duyệt khi chính sách bật và điểm đạt ngưỡng; mỗi lượt ghi `AUTO_APPROVE_FACE_ID`. AI không bao giờ tự từ chối hay tự thu hồi.
+- Nơi chụp lại (App MyDaiNam, Kiosk hoặc cả hai) là tham số của chính sách; mặc định sinh viên chụp lại trên App.
+- Hộp yêu cầu có thêm tab "Đã hủy" cho yêu cầu người gửi tự hủy trên App.
+- Chuỗi duyệt mặc định của sinh viên: GVCN → Phòng Đào tạo; sửa được trong chính sách.
+- Mỗi loại đối tượng chỉ thuộc một chính sách.
+- Các màn của Blueprint cũ (Không gian, Thiết bị, Lịch học, An ninh) được giữ; Không gian và Thiết bị là nguồn dữ liệu cho bước 2 của wizard.
 
 ## Quy tắc DESIGN.md đã áp dụng
 - Ảnh khuôn mặt luôn làm mờ, "Xem rõ" yêu cầu lý do và ghi log; không dùng ảnh thật (hình minh họa SVG).
@@ -39,11 +66,16 @@ Build: `npm run build` (thư mục `dist/`), hoặc `npm run build:single` để
 - Điều khiển: `btn-sm` 32px, `btn` và ô nhập 40px, `btn-lg` 48px; Kiosk 56px. Bo góc 4px cho điều khiển, 8px cho khối.
 - Component dùng chung ở `src/components/ui.jsx`: `Select`, `Tabs`, `Banner`, `MetricStrip`, `SearchInput`, `PageHeader`, `Modal`, `Drawer`, `ConfirmReason`, `DataBoundary`, `SortTh`. Bảng dùng class `.data-table` và hook `useSort`.
 - Thuật ngữ và định dạng số, ngày: xem [docs/glossary.md](docs/glossary.md).
-- Phạm vi: dùng `useScope` (`src/lib/scope.js`) để lọc theo đơn vị và đối tượng. Phạm vi chỉ có hiệu lực ở trang Tổng quan; các trang khác luôn hiển thị toàn bộ dữ liệu.
+- Phạm vi: dùng `useScope` (`src/lib/scope.js`) để lọc theo mã đơn vị (`org_unit`) và `subject_type`. Phạm vi chỉ có hiệu lực ở trang Tổng quan; các trang khác luôn hiển thị toàn bộ dữ liệu.
+- Thành phần mới trong `ui.jsx`: `StateBadge`, `SourceBadge`, `SubjectTypeChip`, `ChipToggleGroup`, `FieldError`, `Switch`, `useCountdown`, `RequirePerm`.
 
 ## Trạng thái dữ liệu
-`DataBoundary` hiển thị trạng thái đang tải, lỗi kèm "Thử lại" và phạm vi chưa có dữ liệu. Khi có backend, chỉ cần thay `loadResource` trong `src/lib/resource.js` bằng lời gọi API.
+`DataBoundary` hiển thị trạng thái đang tải, lỗi kèm "Thử lại" và phạm vi chưa có dữ liệu. Khi có backend, chỉ cần thay `loadResource` trong `src/lib/resource.js` bằng lời gọi API (độ trễ giả lập cũng nằm ở đó).
+
+- Lần đầu mở một trang trong phiên: hiện khung tải theo bố cục trang (prop `skeleton` của `DataBoundary`).
+- Mở lại trang đã tải: hiện dữ liệu ngay và làm mới ngầm, có thanh tiến trình trên cùng (`useResourceLoading`).
+- Hiệu ứng dùng chung trong `index.css`: `.anim-page` khi chuyển trang, `.reveal` để các khối hiện lần lượt, `.anim-grow` cho thanh tỷ lệ. Tất cả tắt khi người dùng bật giảm chuyển động.
 
 Khi chạy dev có thể xem thử bằng cách thêm vào đường dẫn: `#/ho-so?demo=loading` hoặc `#/ho-so?demo=error`.
 
-Dữ liệu là mock (`src/data/mock.js`), trạng thái giữ trong `src/store.jsx` — thay bằng API khi tích hợp backend.
+Hồ sơ, yêu cầu, chính sách, đồng ý, nhật ký đi qua `src/api/client.js`. `src/data/mock.js` chỉ còn dữ liệu cho Không gian, Thiết bị, Lịch học, An ninh và Quy tắc sự kiện.

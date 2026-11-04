@@ -32,6 +32,13 @@ Dùng thống nhất cho mọi màn hình. Thuật ngữ kỹ thuật chỉ xu�
 | Specular, yaw | Chói, nghiêng đầu | |
 | Confidence | Độ chắc chắn của AI | Không phải điểm chất lượng ảnh |
 | Embedding, vector, template | Dữ liệu sinh trắc | |
+| Subject | Đối tượng, hồ sơ định danh | |
+| Consent | Đồng ý (xử lý dữ liệu) | Hiển thị kèm phiên bản điều khoản, ví dụ "Đã xác nhận (v1.2)" |
+| Auto-approve | AI tự duyệt | |
+| Trigger, event | Sự kiện gửi sang hệ thống khác | |
+| Signed URL | Link có thời hạn | 60 giây |
+| Right to be forgotten | Quyền được lãng quên | |
+| Version, rollback | Phiên bản, khôi phục | Khôi phục tạo phiên bản mới, không ghi đè |
 
 ## Thao tác
 

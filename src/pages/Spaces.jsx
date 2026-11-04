@@ -40,7 +40,7 @@ export default function Spaces() {
       <PageHeader title="Không gian & khu vực" desc="Quản lý cây Tòa → Tầng → Phòng, loại khu vực và thiết bị gắn cố định với từng phòng."
         actions={<button className="btn-primary" onClick={() => toast('Thêm khu vực', 'Khu vực mới sẽ ở trạng thái “Chờ duyệt hạ tầng”.')}><Icon name="add" />Thêm khu vực</button>} />
 
-      <DataBoundary name="spaces" label="cây không gian" scopeNote="global">
+      <DataBoundary name="spaces" label="cây không gian" scopeNote="global" skeleton="bar-split">
       <Banner tone="warn" title="Hạ tầng đi trước, thiết bị theo sau." className="mb-space-md">Phòng chưa được duyệt hạ tầng thì chưa được gán camera, thiết bị hay phát hành mã QR điểm danh.</Banner>
 
       <div className="grid grid-cols-12 gap-space-md items-start">
