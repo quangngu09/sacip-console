@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
 import { useApp } from '../store';
 
 export const Icon = ({ name, size = 18, className = '', fill = false }) => (
@@ -76,8 +77,8 @@ export function FaceThumb({ seed = 1, size = 36, round = true, revealed = false,
 const foldText = (s) => s.normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/gi, 'd').toLowerCase();
 
 const SELECT_TRIGGER = {
-  field: 'w-full min-h-[34px] px-2.5 py-1.5 bg-surface border border-border-strong rounded-lg text-body-sm hover:border-status-inactive disabled:bg-surface-container-low disabled:text-text-secondary disabled:border-border-subtle disabled:cursor-not-allowed',
-  inline: 'max-w-[240px] px-2 py-1 rounded-lg text-label-md font-medium hover:bg-surface-container-low',
+  field: 'w-full min-h-[40px] px-3 py-1.5 bg-surface border border-border-control rounded text-body-sm hover:bg-surface-container-low disabled:bg-surface-container-low disabled:text-text-secondary disabled:border-border-subtle disabled:cursor-not-allowed',
+  inline: 'h-8 max-w-[240px] px-2 rounded text-label-md font-medium hover:bg-surface-container-low',
 };
 
 /** Select một lựa chọn theo mẫu combobox của WAI-ARIA. Menu render qua portal nên không bị modal/bảng cắt. */
@@ -279,7 +280,7 @@ export function ConfirmReason({ open, onClose, onConfirm, title, subtitle, dange
         <span className="flex items-center gap-1.5 text-caption text-text-secondary"><Icon name="lock" size={16} className="text-ai-border" />Thao tác sẽ được ký số và ghi log</span>
         <div className="flex gap-2">
           <button className="btn-outline" onClick={onClose}>Hủy bỏ</button>
-          <button disabled={!ok} className={`btn ${danger ? 'bg-status-rejected text-white hover:bg-red-700' : 'bg-primary-container text-white hover:bg-primary'} disabled:opacity-40 disabled:cursor-not-allowed`} onClick={() => onConfirm(reason.trim())}>
+          <button disabled={!ok} className={`btn ${danger ? 'bg-status-rejected text-white hover:bg-red-700' : 'bg-primary-container text-white hover:bg-primary'} disabled:cursor-not-allowed`} onClick={() => onConfirm(reason.trim())}>
             <Icon name="check" />{confirmLabel}
           </button>
         </div>
@@ -321,6 +322,76 @@ export const PageHeader = ({ title, badge, desc, actions }) => (
       {desc && <p className="text-caption text-text-secondary truncate">{desc}</p>}
     </div>
     {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+  </div>
+);
+
+const COUNT_TONE = { 'status-pending': 'text-status-pending', 'status-rejected': 'text-status-rejected' };
+
+/** Thanh tab gạch chân. items: [{ key, label, count, tone }] */
+export function Tabs({ items, value, onChange, label, className = '' }) {
+  const ref = useRef();
+  const onKeyDown = (e) => {
+    const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const i = items.findIndex((t) => t.key === value);
+    const next = items[(i + step + items.length) % items.length];
+    onChange(next.key);
+    ref.current.querySelector(`[data-tab="${next.key}"]`)?.focus();
+  };
+  return (
+    <div ref={ref} role="tablist" aria-label={label} onKeyDown={onKeyDown} className={`flex items-stretch gap-1 overflow-x-auto ${className}`}>
+      {items.map((t) => {
+        const on = t.key === value;
+        return (
+          <button key={t.key} data-tab={t.key} role="tab" aria-selected={on} tabIndex={on ? 0 : -1} onClick={() => onChange(t.key)}
+            className={`h-11 px-3 -mb-px border-b-2 text-label-md whitespace-nowrap flex items-center gap-1.5 transition-colors ${on ? 'border-primary-container text-primary-container font-semibold' : 'border-transparent text-text-secondary hover:text-text-primary'}`}>
+            {t.label}
+            {t.count != null && <span className={`text-caption tabular-nums font-medium ${COUNT_TONE[t.tone] || ''}`}>{t.count}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+const BANNER_TONE = {
+  info: ['bg-primary-fixed border-primary-container/20', 'text-primary-container', 'info'],
+  warn: ['bg-status-pending/10 border-status-pending/30', 'text-status-pending', 'warning'],
+  danger: ['bg-status-rejected/10 border-status-rejected/30', 'text-status-rejected', 'error'],
+};
+
+export const Banner = ({ tone = 'info', icon, title, children, action, className = '' }) => (
+  <div className={`p-3 rounded-lg border flex items-start gap-2.5 text-body-sm ${BANNER_TONE[tone][0]} ${className}`}>
+    <Icon name={icon || BANNER_TONE[tone][2]} size={20} className={BANNER_TONE[tone][1]} />
+    <div className="flex-1 min-w-0">{title && <b className={BANNER_TONE[tone][1]}>{title} </b>}{children}</div>
+    {action && <div className="shrink-0">{action}</div>}
+  </div>
+);
+
+/** Dải số liệu dùng chung. items: [{ label, value, sub, alert, to }] */
+export const MetricStrip = ({ items, className = '' }) => (
+  <div className={`card grid divide-x divide-border-subtle overflow-hidden ${className}`} style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
+    {items.map((m) => {
+      const body = (
+        <>
+          <div className="text-label-md font-normal text-text-secondary">{m.label}</div>
+          <div className="text-[28px] font-semibold leading-9 mt-0.5 tabular-nums">{m.value}</div>
+          <div className={`text-caption mt-0.5 ${m.alert ? 'text-status-pending font-medium' : 'text-text-secondary'}`}>{m.sub}</div>
+        </>
+      );
+      return m.to
+        ? <Link key={m.label} to={m.to} className="block px-space-md py-3 hover:bg-surface-container-low transition-colors -outline-offset-2">{body}</Link>
+        : <div key={m.label} className="px-space-md py-3">{body}</div>;
+    })}
+  </div>
+);
+
+export const SearchInput = ({ value, onChange, placeholder, label, className = '' }) => (
+  <div className={`relative ${className}`}>
+    <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+    <input className="input pl-9 pr-9" aria-label={label || placeholder} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
+    {value && <button type="button" aria-label="Xóa nội dung tìm kiếm" className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded flex items-center justify-center text-text-secondary hover:bg-surface-container" onClick={() => onChange('')}><Icon name="close" size={16} /></button>}
   </div>
 );
 

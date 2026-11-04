@@ -15,7 +15,7 @@ export default function Soc() {
 
   return (
     <div>
-      <PageHeader icon="shield_lock" title="SOC & Ngoại lệ" desc="Giám sát an ninh thời gian thực • duyệt ngoại lệ “Dạy thay” • tra cứu minh chứng khi có khiếu nại điểm danh"
+      <PageHeader icon="shield_lock" title="An ninh & ngoại lệ" desc="Giám sát an ninh thời gian thực • duyệt ngoại lệ “Dạy thay” • tra cứu minh chứng khi có khiếu nại điểm danh"
         badge={<Chip color="status-rejected" icon="sensors">{events.filter((e) => e.state === 'open' && e.level === 'critical').length} sự cố mở</Chip>} />
 
       <div className="grid grid-cols-4 gap-space-md mb-space-md">
@@ -61,9 +61,9 @@ export default function Soc() {
               {cur.title.includes('Khiếu nại') && <div className="p-3 rounded-lg bg-surface-container-low text-body-sm">Sinh viên khiếu nại bị ghi vắng tiết 1-3 C301. Tra cứu: session presence 74% (&lt; 80%) — xem minh chứng để quyết định.</div>}
             </div>
             <div className="p-space-md border-t border-border-subtle flex justify-end gap-2">
-              <button className="btn-outline disabled:opacity-40" disabled={cur.state !== 'open'} onClick={() => { set(cur.id, 'ack'); log('Tiếp nhận sự kiện SOC', cur.id); toast('Đã tiếp nhận', cur.id, 'success'); }}><Icon name="front_hand" />Tiếp nhận</button>
+              <button className="btn-outline" disabled={cur.state !== 'open'} onClick={() => { set(cur.id, 'ack'); log('Tiếp nhận sự kiện SOC', cur.id); toast('Đã tiếp nhận', cur.id, 'success'); }}><Icon name="front_hand" />Tiếp nhận</button>
               <button className="btn-outline" onClick={() => setAsk('evidence')}><Icon name="smart_display" />Xem minh chứng</button>
-              <button className="btn-primary disabled:opacity-40" disabled={cur.state === 'closed'} onClick={() => setAsk('close')}><Icon name="task_alt" />{cur.title.includes('Dạy thay') ? 'Duyệt ngoại lệ' : 'Đóng sự cố'}</button>
+              <button className="btn-primary" disabled={cur.state === 'closed'} onClick={() => setAsk('close')}><Icon name="task_alt" />{cur.title.includes('Dạy thay') ? 'Duyệt ngoại lệ' : 'Đóng sự cố'}</button>
             </div>
           </div>
         )}

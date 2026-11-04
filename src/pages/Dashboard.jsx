@@ -50,7 +50,7 @@ function AttendanceChart() {
     return () => ro.disconnect();
   }, []);
   const H = 196;
-  const pad = { l: 36, r: 12, t: 16, b: 24 };
+  const pad = { l: 44, r: 12, t: 16, b: 24 };
   const band = (width - pad.l - pad.r) / WEEK.length;
   const x = (i) => pad.l + band * (i + 0.5);
   const y = (v) => pad.t + ((Y_MAX - v) / (Y_MAX - Y_MIN)) * (H - pad.t - pad.b);
@@ -63,15 +63,15 @@ function AttendanceChart() {
           {[80, 90, 100].map((t) => (
             <g key={t}>
               <line x1={pad.l} x2={width - pad.r} y1={y(t)} y2={y(t)} className="stroke-border-subtle" />
-              <text x={pad.l - 8} y={y(t) + 4} textAnchor="end" className="fill-text-secondary text-[11px] tabular-nums">{t}%</text>
+              <text x={pad.l - 8} y={y(t) + 4} textAnchor="end" className="fill-text-secondary text-caption tabular-nums">{t}%</text>
             </g>
           ))}
-          {WEEK.map(([d], i) => <text key={d} x={x(i)} y={H - 6} textAnchor="middle" className="fill-text-secondary text-[12px]">{d}</text>)}
+          {WEEK.map(([d], i) => <text key={d} x={x(i)} y={H - 6} textAnchor="middle" className="fill-text-secondary text-caption">{d}</text>)}
           <polyline fill="none" strokeWidth="2" strokeLinejoin="round" className="stroke-primary-container" points={points.map((p) => `${x(p.i)},${y(p.v)}`).join(' ')} />
           {points.map((p) => (
             <g key={p.d}>
               <circle cx={x(p.i)} cy={y(p.v)} r="4" strokeWidth="2" className="fill-primary-container stroke-surface" />
-              {LABELLED.includes(p.d) && active !== p.i && <text x={x(p.i)} y={y(p.v) + (p.d === 'T6' ? 20 : -10)} textAnchor="middle" className="fill-text-primary text-[12px] font-medium tabular-nums">{p.v}%</text>}
+              {LABELLED.includes(p.d) && active !== p.i && <text x={x(p.i)} y={y(p.v) + (p.d === 'T6' ? 20 : -10)} textAnchor="middle" className="fill-text-primary text-caption font-medium tabular-nums">{p.v}%</text>}
               <rect x={x(p.i) - band / 2} y={pad.t} width={band} height={H - pad.t - pad.b} fill="transparent" role="img" tabIndex={0} aria-label={`${p.d}: ${p.v}%`} onMouseEnter={() => setActive(p.i)} onFocus={() => setActive(p.i)} onBlur={() => setActive(null)} />
             </g>
           ))}

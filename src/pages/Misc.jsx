@@ -19,11 +19,11 @@ export function AiMonitor() {
           <div key={l} className="card p-space-md"><div className="flex justify-between text-caption text-text-secondary">{l}<Icon name={i} className={`text-${c}`} /></div><div className="text-[26px] font-semibold tabular-nums">{v}</div><div className="text-caption text-text-secondary">{s}</div></div>
         ))}
       </div>
-      <div className="card overflow-hidden mb-space-md">
-        <table className="w-full text-left text-body-sm">
-          <thead className="bg-surface-bright"><tr className="h-10 text-[12px] uppercase tracking-wider text-text-secondary">{['Mô hình', 'Vị trí chạy', 'Độ trễ p95', 'Độ chính xác', 'Trạng thái'].map((h) => <th key={h} className="px-3 font-medium">{h}</th>)}</tr></thead>
+      <div className="card overflow-x-auto mb-space-md">
+        <table className="data-table">
+          <thead><tr>{['Mô hình', 'Vị trí chạy', 'Độ trễ p95', 'Độ chính xác', 'Trạng thái'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
           <tbody>{models.map(([m, w, l, a]) => (
-            <tr key={m} className="h-12 border-t border-border-subtle/60"><td className="px-3 font-medium">{m}</td><td className="px-3">{w}</td><td className="px-3 font-mono">{l}</td><td className="px-3 font-mono">{a}</td><td className="px-3"><Chip color="status-active">Hoạt động</Chip></td></tr>
+            <tr key={m} className="h-12"><td className="px-3 font-medium">{m}</td><td className="px-3">{w}</td><td className="px-3 font-mono">{l}</td><td className="px-3 font-mono">{a}</td><td className="px-3"><Chip color="status-active">Hoạt động</Chip></td></tr>
           ))}</tbody>
         </table>
       </div>
@@ -53,11 +53,11 @@ export function AuditLog() {
           <button key={k} onClick={() => setF(k)} className={`px-3 py-1 rounded-full text-label-sm ${f === k ? 'bg-primary-container text-white' : 'bg-surface shadow-soft hover:bg-surface-container-low'}`}>{l}</button>
         ))}
       </div>
-      <div className="card overflow-hidden">
-        <table className="w-full text-left text-body-sm">
-          <thead className="bg-surface-bright"><tr className="h-10 text-[12px] uppercase tracking-wider text-text-secondary">{['Thời gian', 'Loại', 'Người / tác nhân', 'Hành động', 'Đối tượng'].map((h) => <th key={h} className="px-3 font-medium">{h}</th>)}</tr></thead>
+      <div className="card overflow-x-auto">
+        <table className="data-table">
+          <thead><tr>{['Thời gian', 'Loại', 'Người / tác nhân', 'Hành động', 'Đối tượng'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
           <tbody>{rows.map((a, i) => (
-            <tr key={i} className={`h-11 border-t border-border-subtle/60 ${a.kind === 'sensitive' ? 'bg-status-pending/5' : ''}`}>
+            <tr key={i} className={`h-11 ${a.kind === 'sensitive' ? 'bg-status-pending/5' : ''}`}>
               <td className="px-3 font-mono text-caption whitespace-nowrap">{a.t}</td>
               <td className="px-3 whitespace-nowrap"><span className={`inline-flex items-center gap-1.5 ${a.kind === 'sensitive' ? 'text-status-pending' : 'text-text-secondary'}`}><Icon name={kindIcon[a.kind]} size={16} />{kindLabel[a.kind]}</span></td>
               <td className="px-3 font-medium">{a.actor}</td>
@@ -80,11 +80,11 @@ export function Consents() {
   return (
     <div>
       <PageHeader icon="verified_user" title="Đồng ý xử lý dữ liệu (NĐ 13/2023)" desc="Quản lý cam kết, mục đích xử lý và quyền rút đồng ý của chủ thể dữ liệu. Rút đồng ý luôn có phương án thay thế phi sinh trắc." />
-      <div className="card overflow-hidden">
-        <table className="w-full text-left text-body-sm">
-          <thead className="bg-surface-bright"><tr className="h-10 text-[12px] uppercase tracking-wider text-text-secondary">{['Mã đối tượng', 'Họ tên', 'Mục đích xử lý', 'Ngày ký', 'Kênh ký', 'Trạng thái', 'Thao tác'].map((h) => <th key={h} className="px-3 font-medium">{h}</th>)}</tr></thead>
+      <div className="card overflow-x-auto">
+        <table className="data-table">
+          <thead><tr>{['Mã đối tượng', 'Họ tên', 'Mục đích xử lý', 'Ngày ký', 'Kênh ký', 'Trạng thái', 'Thao tác'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
           <tbody>{rows.map((c) => (
-            <tr key={c.id} className="h-12 border-t border-border-subtle/60 hover:bg-surface-container-low">
+            <tr key={c.id} className="h-12 hover:bg-surface-container-low">
               <td className="px-3 font-mono font-semibold">{c.id}</td><td className="px-3">{c.name}</td><td className="px-3">{c.purpose}</td><td className="px-3">{c.signed}</td><td className="px-3 text-caption">{c.channel}</td>
               <td className="px-3"><Chip color={cState[c.state][0]}>{cState[c.state][1]}</Chip></td>
               <td className="px-3 text-right">{c.state === 'active' && <button className="text-primary-container text-label-sm font-medium px-2 py-1 rounded hover:bg-surface-container" onClick={() => setAsk(c)}>Ghi nhận rút đồng ý</button>}</td>

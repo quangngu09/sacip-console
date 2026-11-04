@@ -79,7 +79,7 @@ export default function Requests() {
                     <div className="flex items-center gap-1.5">
                       {closed ? <StatusPill status={r.status} /> : <>
                         <span className={`chip ${r.slaUrgent ? 'bg-status-rejected/10 text-status-rejected' :'bg-surface-container text-text-secondary'}`}><Icon name="alarm" size={13} />{r.sla}</span>
-                        {prioColor[r.priority] && <span className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${prioColor[r.priority]}`}>{r.priority}</span>}
+                        {prioColor[r.priority] && <span className={`px-1.5 py-0.5 rounded text-caption font-bold ${prioColor[r.priority]}`}>{r.priority}</span>}
                       </>}
                     </div>
                   </div>
@@ -91,7 +91,7 @@ export default function Requests() {
                       <p className="text-caption text-text-secondary italic truncate">“{r.note}”</p>
                     </div>
                   </div>
-                  <div className="flex justify-between pt-1 text-caption text-text-secondary border-t border-border-subtle/60">
+                  <div className="flex justify-between pt-1 text-caption text-text-secondary">
                     {r.kind === 'consent' ? <span className="text-secondary font-medium flex items-center gap-1"><Icon name="verified_user" size={14} />Quyền tuyệt đối theo NĐ 13</span>
                       : r.ai ? <span className="text-ai-border font-medium flex items-center gap-1"><Icon name="psychology" size={14} />AI gợi ý: {r.ai.confidence}% tin cậy</span> : <span />}
                     <span>{r.status === 'cancelled' ? 'Thao tác đã đóng' : r.footer}</span>
@@ -196,20 +196,20 @@ function ApprovalDetail({ r, onApprove, onReject, onForward, onSimulateCancel })
                 {!revealed && (
                   <div className="absolute inset-0 bg-slate-900/60 flex flex-col items-center justify-center p-3 text-center">
                     <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white mb-2"><Icon name="visibility_off" /></div>
-                    <span className="text-white text-[11px] font-medium mb-2.5">Hình ảnh sinh trắc được mã hóa bảo mật</span>
-                    <button className="px-2.5 py-1 bg-surface text-[11px] font-semibold rounded shadow flex items-center gap-1" onClick={() => setRevealAsk(true)}><Icon name="remove_red_eye" size={14} />Xem rõ (sẽ được ghi log)</button>
-                    <span className="text-slate-300 text-[10px] mt-1.5 flex items-center gap-0.5"><Icon name="shield" size={10} />Admin ID: {CURRENT_USER.id}</span>
+                    <span className="text-white text-caption font-medium mb-2.5">Hình ảnh sinh trắc được mã hóa bảo mật</span>
+                    <button className="px-2.5 py-1 bg-surface text-caption font-semibold rounded shadow flex items-center gap-1" onClick={() => setRevealAsk(true)}><Icon name="remove_red_eye" size={14} />Xem rõ (sẽ được ghi log)</button>
+                    <span className="text-slate-300 text-caption mt-1.5 flex items-center gap-0.5"><Icon name="shield" size={10} />Admin ID: {CURRENT_USER.id}</span>
                   </div>
                 )}
               </div>
-              <span className="text-[11px] text-text-secondary text-center">Trạm chụp: Kiosk #03 • 09:14 24/10/2025</span>
+              <span className="text-caption text-text-secondary text-center">Trạm chụp: Kiosk #03 • 09:14 24/10/2025</span>
             </div>
           </div>
         </section>
 
         {r.ai && (
           <AiCard>
-            <div className="flex justify-end -mt-8 mb-2"><span className="px-2 py-0.5 rounded bg-ai-border/10 text-ai-border text-[11px] font-semibold">Độ tin cậy mô hình: {r.ai.confidence}%</span></div>
+            <div className="flex justify-end -mt-8 mb-2"><span className="px-2 py-0.5 rounded bg-ai-border/10 text-ai-border text-caption font-semibold">Độ tin cậy mô hình: {r.ai.confidence}%</span></div>
             <div className="grid grid-cols-3 gap-space-sm">
               <Metric label="Chất lượng ảnh trực diện" value={`${r.ai.quality} / 100`} good={r.ai.quality >= 85} warn={r.ai.quality >= 60} sub={r.ai.quality < 85 ? 'Specular glare trán 38% • Lệch yaw 22°' : 'Đạt chuẩn ICAO'} />
               <Metric label="Khớp khuôn mặt CCCD" value={`${r.ai.match}%`} good={r.ai.match >= 90} sub={r.ai.match >= 90 ? 'Không phát hiện mạo danh' : 'Độ khớp thấp'} />
@@ -243,7 +243,7 @@ function ApprovalDetail({ r, onApprove, onReject, onForward, onSimulateCancel })
         </section>
 
         <section className="pt-2 border-t border-border-subtle">
-          <div className="flex justify-between text-caption mb-2"><span className="font-semibold text-text-secondary uppercase">Nhật ký truy vết (Audit Trail)</span><span className="text-primary-container">Xem toàn bộ tại Nhật ký & Báo cáo</span></div>
+          <div className="flex justify-between text-caption mb-2"><span className="font-semibold text-text-secondary">Nhật ký truy vết (Audit Trail)</span><span className="text-primary-container">Xem toàn bộ tại Nhật ký & Báo cáo</span></div>
           <div className="bg-surface-bright rounded p-2.5 text-caption font-mono text-text-secondary space-y-1.5">
             <div>[14:20:12] BIO-CLIENT KIOSK_03: Capture failed (specular highlight &gt; 35%)</div>
             <div>[14:20:45] REQUEST-SUBMIT: {r.subjectId} tạo {r.id}</div>
@@ -255,11 +255,11 @@ function ApprovalDetail({ r, onApprove, onReject, onForward, onSimulateCancel })
       <div className="p-space-md border-t border-border-subtle flex items-center justify-between gap-space-md mt-auto">
         <div className="flex gap-2">
           <button className="btn-outline" disabled={closed} onClick={onForward}><Icon name="forward" />Chuyển cấp</button>
-          <button className="btn border border-status-rejected/30 text-status-rejected hover:bg-status-rejected/10 disabled:opacity-40" disabled={closed} onClick={onReject}><Icon name="close" />Từ chối</button>
+          <button className="btn border border-status-rejected/30 text-status-rejected hover:bg-status-rejected/10" disabled={closed} onClick={onReject}><Icon name="close" />Từ chối</button>
         </div>
         <div className="flex gap-2">
           {!closed && <button className="btn text-text-secondary hover:text-text-primary" title="Mô phỏng: sinh viên tự hủy qua App" onClick={onSimulateCancel}><Icon name="smartphone" />Mô phỏng hủy</button>}
-          <button className="btn bg-primary-container text-white hover:bg-primary px-5 py-2 font-semibold disabled:opacity-40" disabled={closed} onClick={onApprove}>
+          <button className="btn bg-primary-container text-white hover:bg-primary px-5 py-2 font-semibold" disabled={closed} onClick={onApprove}>
             <Icon name="check_circle" />{r.twoPerson ? (r.firstApproval ? 'Xác nhận người thứ 2' : 'Xác nhận người thứ 1') : 'Phê duyệt yêu cầu'}
           </button>
         </div>
@@ -278,7 +278,7 @@ const Metric = ({ label, value, sub, good, warn }) => {
     <div className="p-2.5 bg-surface rounded flex flex-col gap-1 shadow-soft">
       <span className="text-caption text-text-secondary">{label}</span>
       <span className={`text-headline-md font-bold ${c}`}>{value}</span>
-      <span className="text-[11px] text-text-secondary">{sub}</span>
+      <span className="text-caption text-text-secondary">{sub}</span>
     </div>
   );
 };
@@ -308,7 +308,7 @@ function ApproveModal({ open, r, onClose, onConfirm }) {
           <Field label="Trạm Kiosk áp dụng" value={<span className="font-medium flex items-center gap-1.5"><Icon name="point_of_sale" size={16} className="text-ai-border" />Kiosk 01, 02, 03</span>} />
           <Field label="Thời hạn hiệu lực" value={<span className="font-medium flex items-center gap-1.5"><Icon name="timelapse" size={16} className="text-status-pending" />48 giờ</span>} />
           <Field label="Số lần chụp tối đa" value={<span className="font-medium">01 lần (one-time slot)</span>} />
-          <Field label="Thuật toán đối soát bắt buộc" value={<span className="font-mono text-[12px] font-medium">Liveness v3.2 + ICAO-9303</span>} />
+          <Field label="Thuật toán đối soát bắt buộc" value={<span className="font-mono text-caption font-medium">Liveness v3.2 + ICAO-9303</span>} />
         </div>
         <label className="flex flex-col gap-1.5">
           <span className="text-label-md font-semibold flex justify-between"><span>Lý do phê duyệt / Ghi chú kiểm toán <span className="text-status-rejected">*</span></span><span className="text-caption text-text-secondary font-normal">Bắt buộc theo ISO 27701</span></span>
@@ -321,7 +321,7 @@ function ApproveModal({ open, r, onClose, onConfirm }) {
         <span className="flex items-center gap-1.5 text-caption text-text-secondary"><Icon name="lock" size={16} className="text-ai-border" />Ký số định danh: <b>{CURRENT_USER.name} (PĐT)</b></span>
         <div className="flex gap-2">
           <button className="btn-outline" onClick={onClose}>Hủy bỏ</button>
-          <button className="btn bg-primary-container text-white hover:bg-primary px-5 font-semibold disabled:opacity-40" disabled={!ok} onClick={() => onConfirm(reason.trim())}><Icon name="check" />Xác nhận phê duyệt</button>
+          <button className="btn bg-primary-container text-white hover:bg-primary px-5 font-semibold" disabled={!ok} onClick={() => onConfirm(reason.trim())}><Icon name="check" />Xác nhận phê duyệt</button>
         </div>
       </div>
     </Modal>
@@ -379,7 +379,7 @@ function ConsentDetail({ r, onDone }) {
       </div>
       <div className="p-space-md border-t border-border-subtle flex items-center justify-between mt-auto">
         <span className="flex items-center gap-1.5 text-caption text-text-secondary"><Icon name="gavel" size={16} className="text-secondary" />Quyền rút đồng ý không thể bị từ chối — không có nút từ chối.</span>
-        <button className="btn bg-secondary text-white hover:opacity-90 px-6 py-2.5 font-semibold disabled:opacity-40" disabled={done} onClick={onDone}><Icon name="verified" />{done ? 'Đã xử lý' : 'Xác nhận đã xử lý'}</button>
+        <button className="btn bg-secondary text-white hover:opacity-90 px-6 py-2.5 font-semibold" disabled={done} onClick={onDone}><Icon name="verified" />{done ? 'Đã xử lý' : 'Xác nhận đã xử lý'}</button>
       </div>
     </>
   );

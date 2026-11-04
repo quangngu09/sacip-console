@@ -86,7 +86,7 @@ export default function Profiles() {
           {VIEWS.map((v) => (
             <button key={v.key} onClick={() => setView(v.key)} className={`pb-2.5 pt-1.5 px-space-sm text-label-md whitespace-nowrap flex items-center gap-1.5 border-b-2 ${view === v.key ? 'text-primary-container font-semibold border-primary-container' : 'text-text-secondary border-transparent hover:text-text-primary'}`}>
               {v.label}
-              <span className={`px-1.5 rounded-full text-[11px] font-semibold ${{ 'status-pending': 'bg-status-pending/10 text-status-pending', 'status-rejected': 'bg-status-rejected/10 text-status-rejected' }[v.tone] || 'bg-primary-container/10 text-primary-container'}`}>{v.count}</span>
+              <span className={`px-1.5 rounded-full text-caption font-semibold ${{ 'status-pending': 'bg-status-pending/10 text-status-pending', 'status-rejected': 'bg-status-rejected/10 text-status-rejected' }[v.tone] || 'bg-primary-container/10 text-primary-container'}`}>{v.count}</span>
             </button>
           ))}
           <button className="pb-2.5 pt-1.5 px-space-sm text-ai-border text-label-md whitespace-nowrap flex items-center gap-1" onClick={() => toast('Tạo góc nhìn', 'Lưu tổ hợp bộ lọc hiện tại thành tab mới.')}><Icon name="add_circle" size={16} />Tạo góc nhìn</button>
@@ -159,9 +159,9 @@ export default function Profiles() {
         <div className="overflow-x-auto max-h-[calc(100vh-260px)]">
           <table className="w-full text-left border-collapse">
             <thead className="bg-surface-bright sticky top-0 z-10">
-              <tr className="h-10 text-text-secondary text-[12px] uppercase tracking-wider">
+              <tr className="h-10 text-text-secondary text-caption">
                 <th className="w-10 px-3 text-center"><input type="checkbox" checked={allChecked} onChange={toggleAll} className="w-4 h-4 accent-primary-container" aria-label="Chọn tất cả" /></th>
-                {['Mã đối tượng', 'Họ tên & Ảnh Face ID', 'Phân loại', 'Đơn vị / Khoa', 'Nguồn dữ liệu', 'Trạng thái thu thập', 'Thời hạn hiệu lực', 'Điểm AI (ICAO)', 'Cờ rủi ro'].map((h) => <th key={h} className="px-3 font-medium whitespace-nowrap">{h}</th>)}
+                {['Mã đối tượng', 'Họ tên & Ảnh Face ID', 'Phân loại', 'Đơn vị / Khoa', 'Nguồn dữ liệu', 'Trạng thái thu thập', 'Thời hạn hiệu lực', 'Điểm AI (ICAO)', 'Cờ rủi ro'].map((h) => <th key={h}>{h}</th>)}
                 <th className="px-3 text-right font-medium">Thao tác</th>
               </tr>
             </thead>
@@ -169,7 +169,7 @@ export default function Profiles() {
               {rows.map((p) => {
                 const st = STATUS_META[p.status];
                 return (
-                  <tr key={p.id} className={`h-12 border-t border-border-subtle/60 hover:bg-surface-container-low transition-colors ${selected.has(p.id) ? 'bg-surface-container-low/60' : ''}`}>
+                  <tr key={p.id} className={`h-12 hover:bg-surface-container-low transition-colors ${selected.has(p.id) ? 'bg-surface-container-low/60' : ''}`}>
                     <td className="px-3 text-center"><input type="checkbox" checked={selected.has(p.id)} onChange={() => toggle(p.id)} className="w-4 h-4 accent-primary-container" aria-label={`Chọn ${p.id}`} /></td>
                     <td className="px-3 font-mono text-label-md font-semibold whitespace-nowrap">{p.id}</td>
                     <td className="px-3">
@@ -178,11 +178,11 @@ export default function Profiles() {
                         <div className="min-w-0"><div className="text-label-md font-semibold truncate">{p.name}</div><div className="text-caption text-text-secondary truncate">{p.email}</div></div>
                       </div>
                     </td>
-                    <td className="px-3"><Chip color={typeColor[p.type]} className="text-[12px] whitespace-nowrap">{p.type}</Chip></td>
+                    <td className="px-3"><Chip color={typeColor[p.type]} className="text-caption whitespace-nowrap">{p.type}</Chip></td>
                     <td className="px-3 whitespace-nowrap">{p.unit}</td>
-                    <td className="px-3">{p.source ? <span className="px-2 py-0.5 rounded bg-surface-container text-[11px] whitespace-nowrap">{p.source}</span> : <span className="text-text-secondary">—</span>}</td>
+                    <td className="px-3">{p.source ? <span className="px-2 py-0.5 rounded bg-surface-container text-caption whitespace-nowrap">{p.source}</span> : <span className="text-text-secondary">—</span>}</td>
                     <td className="px-3 whitespace-nowrap"><StatusDot color={st.color} label={st.label} /></td>
-                    <td className="px-3 text-[12px] whitespace-nowrap">{p.expiring ? <Chip color="status-pending">{p.validity}</Chip> : <span className={p.status === 'locked' ? 'text-status-rejected font-medium' : p.status === 'quality' ? 'text-status-pending font-medium' : p.validity ? '' : 'text-text-secondary'}>{p.validity || '—'}</span>}</td>
+                    <td className="px-3 text-caption whitespace-nowrap">{p.expiring ? <Chip color="status-pending">{p.validity}</Chip> : <span className={p.status === 'locked' ? 'text-status-rejected font-medium' : p.status === 'quality' ? 'text-status-pending font-medium' : p.validity ? '' : 'text-text-secondary'}>{p.validity || '—'}</span>}</td>
                     <td className="px-3"><ScoreBar value={p.score} /></td>
                     <td className="px-3">{p.risk ? <Chip color="status-rejected" icon="warning" className="whitespace-nowrap">{p.risk}</Chip> : <span className="text-caption text-text-secondary whitespace-nowrap">{p.status === 'none' ? 'Chưa chụp ảnh' : 'Không có'}</span>}</td>
                     <td className="px-3 text-right whitespace-nowrap">
@@ -252,7 +252,7 @@ function ProfileDrawer({ profile, onClose }) {
         </div>
         <div className="flex items-start justify-between">
           <div><div className="flex items-baseline gap-2"><h2 className="text-headline-md font-bold">{profile.name}</h2><span className="font-mono text-label-sm text-text-secondary">{profile.id}</span></div><span className="text-caption text-text-secondary">{profile.unit}</span></div>
-          <Chip color={typeColor[profile.type]} className="text-[12px]">{profile.type}</Chip>
+          <Chip color={typeColor[profile.type]} className="text-caption">{profile.type}</Chip>
         </div>
         <div className="flex justify-between text-caption pt-1 border-t border-border-subtle"><StatusDot color={STATUS_META[profile.status].color} label={STATUS_META[profile.status].label} /><span className="text-text-secondary">Đại học Đại Nam</span></div>
       </div>
@@ -261,21 +261,21 @@ function ProfileDrawer({ profile, onClose }) {
         <section className="rounded-xl border border-border-subtle p-space-sm bg-surface-container-low/50">
           <div className="flex items-center justify-between mb-1">
             <span className="flex items-center gap-1.5 text-label-md font-semibold"><Icon name="lock" className="text-primary-container" />Dữ liệu ảnh khuôn mặt</span>
-            <span className="px-2 py-0.5 rounded bg-surface-container text-text-secondary font-mono text-[11px]">6 góc chụp</span>
+            <span className="px-2 py-0.5 rounded bg-surface-container text-text-secondary font-mono text-caption">6 góc chụp</span>
           </div>
           <p className="text-caption text-text-secondary mb-2">Ảnh gốc được làm mờ mặc định. Admin Core chỉ giữ vector đã mã hóa; ảnh hiển thị lấy từ kho đối soát có thời hạn.</p>
           <div className="mb-2 p-1.5 bg-surface rounded-lg border border-border-subtle flex items-center justify-between">
             <span className="flex items-center gap-2 text-caption text-text-secondary"><Icon name="shield" className="text-ai-border" />Mở khóa ảnh tạo bản ghi kiểm toán bất biến.</span>
             {revealed
-              ? <button className="h-7 px-2.5 rounded bg-surface-container text-[12px] font-medium flex items-center gap-1" onClick={() => setRevealed(false)}><Icon name="visibility_off" size={15} />Làm mờ lại</button>
-              : <button className="h-7 px-2.5 rounded bg-primary-container text-white text-[12px] font-medium whitespace-nowrap shrink-0 flex items-center gap-1" onClick={() => setConfirm('reveal')}><Icon name="visibility" size={15} />Xem rõ (sẽ được ghi log)</button>}
+              ? <button className="h-7 px-2.5 rounded bg-surface-container text-caption font-medium flex items-center gap-1" onClick={() => setRevealed(false)}><Icon name="visibility_off" size={15} />Làm mờ lại</button>
+              : <button className="h-7 px-2.5 rounded bg-primary-container text-white text-caption font-medium whitespace-nowrap shrink-0 flex items-center gap-1" onClick={() => setConfirm('reveal')}><Icon name="visibility" size={15} />Xem rõ (sẽ được ghi log)</button>}
           </div>
           <div className="grid grid-cols-3 gap-2">
             {poses.map(([n, s, l], i) => (
               <div key={n} className="flex flex-col items-center bg-surface p-1.5 rounded-lg border border-border-subtle text-center">
                 <div className="mb-1"><FaceThumb seed={profile.seed + i * 0.15} size={80} round={false} revealed={revealed} /></div>
-                <span className="text-[11px] font-semibold">{i + 1}. {n}</span>
-                <span className={`text-[10px] font-medium ${scoreColor(s)}`}>{s}/100 ({l})</span>
+                <span className="text-caption font-semibold">{i + 1}. {n}</span>
+                <span className={`text-caption font-medium ${scoreColor(s)}`}>{s}/100 ({l})</span>
               </div>
             ))}
           </div>
@@ -284,32 +284,32 @@ function ProfileDrawer({ profile, onClose }) {
         <AiCard>
           <div className="space-y-1.5">
             {poses.map(([n, s]) => (
-              <div key={n} className="p-2 bg-surface rounded-lg border border-border-subtle flex items-center justify-between text-[12px]">
+              <div key={n} className="p-2 bg-surface rounded-lg border border-border-subtle flex items-center justify-between text-caption">
                 <span className="flex items-center gap-1.5"><span className={`w-2 h-2 rounded-full ${s >= 85 ? 'bg-status-active' : s >= 70 ? 'bg-status-pending' : 'bg-status-rejected'}`} />{n}: <b className={`font-mono ${scoreColor(s)}`}>{s}/100</b></span>
                 <span className={scoreColor(s)}>{s >= 85 ? 'Đạt chuẩn' : s >= 70 ? 'Chấp nhận được' : 'Lỗi: chói trán 38%, nghiêng 22°'}</span>
               </div>
             ))}
           </div>
           <div className="grid grid-cols-2 gap-2 mt-2">
-            <div className="p-2 bg-surface rounded-lg border border-border-subtle"><div className="text-[11px] text-text-secondary">Đối sánh 1:1 CCCD</div><div className="font-mono font-bold text-status-active">94.2%</div></div>
-            <div className="p-2 bg-surface rounded-lg border border-border-subtle"><div className="text-[11px] text-text-secondary">Liveness / Anti-spoofing</div><div className={`font-mono font-bold ${profile.risk?.includes('Spoof') ? 'text-status-rejected' : 'text-status-active'}`}>{profile.risk?.includes('Spoof') ? 'FAIL (42%)' : 'PASS (99.4%)'}</div></div>
+            <div className="p-2 bg-surface rounded-lg border border-border-subtle"><div className="text-caption text-text-secondary">Đối sánh 1:1 CCCD</div><div className="font-mono font-bold text-status-active">94.2%</div></div>
+            <div className="p-2 bg-surface rounded-lg border border-border-subtle"><div className="text-caption text-text-secondary">Liveness / Anti-spoofing</div><div className={`font-mono font-bold ${profile.risk?.includes('Spoof') ? 'text-status-rejected' : 'text-status-active'}`}>{profile.risk?.includes('Spoof') ? 'FAIL (42%)' : 'PASS (99.4%)'}</div></div>
           </div>
-          <div className="flex justify-between text-[11px] text-text-secondary pt-2"><span>SCRFD + ArcFace (buffalo_l) • Quality Gating v3.2</span><span className="italic text-secondary">AI khuyến nghị, người duyệt quyết định</span></div>
+          <div className="flex justify-between text-caption text-text-secondary pt-2"><span>SCRFD + ArcFace (buffalo_l) • Quality Gating v3.2</span><span className="italic text-secondary">AI khuyến nghị, người duyệt quyết định</span></div>
         </AiCard>
 
         <section className="rounded-xl border border-border-subtle p-space-sm">
           <div className="text-label-md font-semibold mb-2 flex items-center gap-1.5"><Icon name="history" className="text-primary-container" />Lịch sử phiên bản</div>
-          <div className="space-y-3 pl-4 border-l-2 border-border-subtle ml-2 text-[12px]">
-            <div className="relative"><span className="w-2.5 h-2.5 rounded-full bg-status-pending absolute -left-[22px] top-1" /><b>v2.0 (Hiện tại)</b> <Chip color="status-pending">Chờ duyệt</Chip><div className="text-[11px] text-text-secondary">14:32 25/10/2025 • Kiosk số 03 (Phiên #TR3-2025-041)</div></div>
-            <div className="relative"><span className="w-2.5 h-2.5 rounded-full bg-status-inactive absolute -left-[22px] top-1" /><span className="text-text-secondary">v1.0 (Lưu trữ)</span><div className="text-[11px] text-text-secondary">15/09/2023 • App MyDaiNam (đã thay thế)</div></div>
+          <div className="space-y-3 pl-4 border-l-2 border-border-subtle ml-2 text-caption">
+            <div className="relative"><span className="w-2.5 h-2.5 rounded-full bg-status-pending absolute -left-[22px] top-1" /><b>v2.0 (Hiện tại)</b> <Chip color="status-pending">Chờ duyệt</Chip><div className="text-caption text-text-secondary">14:32 25/10/2025 • Kiosk số 03 (Phiên #TR3-2025-041)</div></div>
+            <div className="relative"><span className="w-2.5 h-2.5 rounded-full bg-status-inactive absolute -left-[22px] top-1" /><span className="text-text-secondary">v1.0 (Lưu trữ)</span><div className="text-caption text-text-secondary">15/09/2023 • App MyDaiNam (đã thay thế)</div></div>
           </div>
         </section>
 
         <section className="rounded-xl border border-border-subtle p-space-sm">
           <div className="text-label-md font-semibold mb-1.5 flex items-center gap-1.5"><Icon name="verified_user" className="text-status-active" />Tình trạng đồng ý (NĐ 13/2023)</div>
-          <div className="p-2 rounded-lg bg-surface-bright border border-border-subtle text-[12px] space-y-1">
+          <div className="p-2 rounded-lg bg-surface-bright border border-border-subtle text-caption space-y-1">
             <div className="flex justify-between"><span className="font-medium">Cam kết xử lý dữ liệu sinh trắc:</span><Chip color="status-active">Đã ký điện tử</Chip></div>
-            <div className="text-[11px] text-text-secondary"><b className="text-text-primary">Mục đích hợp lệ:</b> Điểm danh giảng đường, kiểm soát ra vào, phát hành thẻ.</div>
+            <div className="text-caption text-text-secondary"><b className="text-text-primary">Mục đích hợp lệ:</b> Điểm danh giảng đường, kiểm soát ra vào, phát hành thẻ.</div>
           </div>
         </section>
       </div>
@@ -320,7 +320,7 @@ function ProfileDrawer({ profile, onClose }) {
           <button className="btn h-9 border border-status-rejected/30 text-status-rejected hover:bg-status-rejected/10" onClick={() => setConfirm('revoke')}><Icon name="cancel" size={16} />Thu hồi</button>
           <button className="btn-primary h-9 flex-1 justify-center" onClick={() => setConfirm('rescan')}><Icon name="add_task" size={16} />Tạo yêu cầu chụp lại</button>
         </div>
-        <div className="text-center text-[11px] text-text-secondary flex items-center justify-center gap-1"><Icon name="verified" size={13} className="text-ai-border" />Thao tác của cán bộ sẽ được ký số và lưu vết.</div>
+        <div className="text-center text-caption text-text-secondary flex items-center justify-center gap-1"><Icon name="verified" size={13} className="text-ai-border" />Thao tác của cán bộ sẽ được ký số và lưu vết.</div>
       </div>
 
       <ConfirmReason open={!!confirm} onClose={() => setConfirm(null)} onConfirm={(r) => act(confirm, r)} danger={confirm === 'revoke' || confirm === 'lock'}

@@ -31,7 +31,7 @@ export default function Spaces() {
 
   return (
     <div>
-      <PageHeader icon="account_tree" title="Không gian & Zone" desc="Master Data / GIS • Cây phân cấp Trường → Tòa → Tầng → Phòng, định nghĩa Zone và map cứng Camera_ID → Room_ID"
+      <PageHeader icon="account_tree" title="Không gian & khu vực" desc="Master Data / GIS • Cây phân cấp Trường → Tòa → Tầng → Phòng, định nghĩa Zone và map cứng Camera_ID → Room_ID"
         actions={<><button className="btn-outline"><Icon name="upload" />Nhập từ CMDB</button><button className="btn-primary" onClick={() => toast('Thêm khu vực', 'Khu vực mới sẽ ở trạng thái “Chờ duyệt hạ tầng”.')}><Icon name="add" />Thêm khu vực</button></>} />
 
       <div className="mb-space-md p-3 rounded-lg bg-status-pending/10 border border-status-pending/30 flex gap-3 text-body-sm">
@@ -41,7 +41,7 @@ export default function Spaces() {
 
       <div className="grid grid-cols-12 gap-space-md items-start">
         <div className="col-span-5 card p-space-sm">
-          <div className="px-2 py-1.5 flex justify-between text-caption text-text-secondary"><span className="font-semibold uppercase tracking-wider">Cây không gian</span><span>{rooms.length} phòng • {rooms.filter((r) => !r.approved).length} chờ duyệt</span></div>
+          <div className="px-2 py-1.5 flex justify-between text-caption text-text-secondary"><span className="font-semibold">Cây không gian</span><span>{rooms.length} phòng • {rooms.filter((r) => !r.approved).length} chờ duyệt</span></div>
           {tree.map((b) => (
             <div key={b.id}>
               <button className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-surface-container-low text-label-md font-semibold" onClick={() => toggle(b.id)}>
@@ -107,13 +107,13 @@ export default function Spaces() {
                 <div className="text-label-md font-semibold mb-2 flex items-center gap-1.5"><Icon name="add_link" />Gán thiết bị vào phòng</div>
                 <div className="flex gap-2">
                   <Select className="min-w-0 flex-1" label="Thiết bị chưa gán" placeholder="Chọn thiết bị chưa gán" value={assign} options={free.map((d) => ({ value: d.id, label: `${d.id} • ${d.kind}` }))} onChange={setAssign} disabled={!room.approved} />
-                  <button className="btn-primary shrink-0 disabled:opacity-40" onClick={doAssign} disabled={!room.approved || !assign}><Icon name="link" />Gán</button>
+                  <button className="btn-primary shrink-0" onClick={doAssign} disabled={!room.approved || !assign}><Icon name="link" />Gán</button>
                 </div>
                 {!room.approved && <p className="text-caption text-status-pending mt-1.5 flex items-center gap-1"><Icon name="lock" size={14} />Bị khóa cho đến khi phòng được duyệt hạ tầng.</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-2">
-                <button className="btn-outline justify-center disabled:opacity-40" disabled={!room.approved} onClick={() => { log('Phát hành mã QR điểm danh', room.id); toast('Đã phát hành QR', `QR điểm danh dự phòng cho ${room.id}.`, 'success'); }}><Icon name="qr_code_2" />Phát hành QR điểm danh</button>
+                <button className="btn-outline justify-center" disabled={!room.approved} onClick={() => { log('Phát hành mã QR điểm danh', room.id); toast('Đã phát hành QR', `QR điểm danh dự phòng cho ${room.id}.`, 'success'); }}><Icon name="qr_code_2" />Phát hành QR điểm danh</button>
                 <button className="btn-outline justify-center"><Icon name="history" />Lịch sử thay đổi</button>
               </div>
             </div>

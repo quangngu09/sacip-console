@@ -12,18 +12,18 @@ export default function Schedule() {
   const { toast, log } = useApp();
   return (
     <div>
-      <PageHeader icon="calendar_month" title="TKB & Điểm danh" desc="EMS Integration (read-only sync) • Workflow A: Điểm danh & kích hoạt ghi hình bài giảng • Workflow B: Media Pipeline"
+      <PageHeader icon="calendar_month" title="Lịch học & điểm danh" desc="EMS Integration (read-only sync) • Workflow A: Điểm danh & kích hoạt ghi hình bài giảng • Workflow B: Media Pipeline"
         badge={<Chip color="status-active" icon="sync">Đồng bộ EMS: 2 phút trước</Chip>}
         actions={<button className="btn-outline" onClick={() => { log('Đồng bộ thủ công TKB từ EMS', 'EMS'); toast('Đã đồng bộ TKB', '128 tiết học hôm nay • 3 lịch đổi phòng • múi giờ Asia/Ho_Chi_Minh.', 'success'); }}><Icon name="sync" />Đồng bộ ngay</button>} />
 
-      <div className="card overflow-hidden mb-space-md">
-        <table className="w-full text-left text-body-sm">
-          <thead className="bg-surface-bright"><tr className="h-10 text-[12px] uppercase tracking-wider text-text-secondary">
-            {['Khung giờ', 'Phòng', 'Học phần / Lớp', 'Giảng viên', 'PRESENT', 'LATE', 'Vắng', 'Ghi hình bài giảng', 'Thao tác'].map((h) => <th key={h} className="px-3 font-medium">{h}</th>)}
+      <div className="card overflow-x-auto mb-space-md">
+        <table className="data-table">
+          <thead><tr>
+            {['Khung giờ', 'Phòng', 'Học phần / Lớp', 'Giảng viên', 'PRESENT', 'LATE', 'Vắng', 'Ghi hình bài giảng', 'Thao tác'].map((h) => <th key={h}>{h}</th>)}
           </tr></thead>
           <tbody>
             {SCHEDULE.map((s, i) => (
-              <tr key={i} className="h-14 border-t border-border-subtle/60 hover:bg-surface-container-low">
+              <tr key={i} className="h-14 hover:bg-surface-container-low">
                 <td className="px-3 whitespace-nowrap">{s.slot}</td>
                 <td className="px-3 font-mono font-semibold">{s.room}</td>
                 <td className="px-3"><div className="font-medium">{s.course}</div><div className="text-caption text-text-secondary">{s.cls}</div></td>

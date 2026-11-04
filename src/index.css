@@ -4,19 +4,27 @@
 
 @layer base {
   html, body { font-family: theme('fontFamily.sans'); color: theme('colors.text-primary'); -webkit-font-smoothing: antialiased; }
-  body { background: theme('colors.background'); min-width: 1280px; }
+  body { background: theme('colors.background'); font-size: 14px; line-height: 20px; min-width: 1280px; }
   :focus-visible { outline: 2px solid theme('colors.primary-container'); outline-offset: 2px; border-radius: 3px; }
 }
 
 @layer components {
-  .card { @apply bg-surface rounded-lg border border-border-subtle; }
-  .btn { @apply inline-flex items-center whitespace-nowrap gap-1.5 px-3 py-1.5 rounded-lg text-label-md font-medium transition-colors; }
+  .card { @apply bg-surface rounded-xl border border-border-subtle; }
+  .btn { @apply inline-flex items-center justify-center whitespace-nowrap gap-1.5 h-10 px-3.5 rounded text-label-md font-medium transition-colors disabled:cursor-not-allowed disabled:bg-surface-container disabled:text-text-secondary disabled:border-transparent; }
   .btn-primary { @apply btn bg-primary-container text-on-primary hover:bg-primary; }
   .btn-ghost { @apply btn bg-surface-container hover:bg-surface-container-high text-text-primary; }
-  .btn-outline { @apply btn border border-border-strong bg-surface hover:bg-surface-container-low text-text-primary; }
-  .chip { @apply inline-flex items-center whitespace-nowrap gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium; }
-  .input { @apply w-full px-3 py-1.5 bg-surface-bright border border-border-strong rounded-lg text-body-sm outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container; }
-  .section-title { @apply text-body-md font-semibold text-text-primary; }
+  .btn-outline { @apply btn border border-border-control bg-surface hover:bg-surface-container-low text-text-primary; }
+  .btn-danger { @apply btn border border-status-rejected/50 bg-surface text-status-rejected hover:bg-status-rejected/10; }
+  .btn-sm { @apply h-8 px-2.5 text-label-sm; }
+  .btn-lg { @apply h-12 px-5 text-body-lg; }
+  .chip { @apply inline-flex items-center whitespace-nowrap gap-1 px-1.5 py-0.5 rounded text-caption font-medium; }
+  .input { @apply w-full min-h-[40px] px-3 py-2 bg-surface border border-border-control rounded text-body-sm outline-none placeholder:text-text-secondary focus:border-primary-container focus:ring-1 focus:ring-primary-container; }
+  .section-title { @apply text-headline-md text-text-primary; }
+  .page-fill { height: calc(100vh - 56px - 32px); min-height: 560px; }
+  .data-table { @apply w-full text-left text-body-sm border-separate; border-spacing: 0; }
+  .data-table th { @apply h-10 px-3 bg-surface-container-low text-label-sm text-text-secondary whitespace-nowrap border-b border-border-subtle; }
+  .data-table td { @apply px-3 py-2 border-b border-border-subtle; }
+  .data-table tbody tr:last-child td { border-bottom: 0; }
   .ms { overflow: hidden; width: 1em; height: 1em; flex-shrink: 0; font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; direction: ltr; -webkit-font-feature-settings: 'liga'; font-feature-settings: 'liga'; }
 }
 

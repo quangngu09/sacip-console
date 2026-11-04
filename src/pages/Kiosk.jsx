@@ -45,7 +45,7 @@ function CamView({ label, status, phase, slot, videoRef, big }) {
   }, [stream, ref]);
   const live = !!stream;
   return (
-    <div className="relative rounded-lg overflow-hidden bg-rail aspect-video flex flex-col justify-between p-2 text-caption">
+    <div className="relative rounded-lg overflow-hidden bg-inverse-surface aspect-video flex flex-col justify-between p-2 text-caption">
       <video ref={ref} muted playsInline autoPlay className={`absolute inset-0 w-full h-full object-cover -scale-x-100 ${live ? '' : 'hidden'}`} />
       {!live && (
         <div className={`absolute inset-0 flex flex-col items-center gap-1 text-rail-text ${big ? 'justify-center' : 'justify-end pb-2'}`}>
@@ -60,7 +60,7 @@ function CamView({ label, status, phase, slot, videoRef, big }) {
       )}
       <div className="relative flex items-center justify-between gap-2 text-white">
         <span className="px-1.5 py-0.5 rounded bg-black/60 font-medium truncate">{label}</span>
-        <span className={`w-2 h-2 rounded-full shrink-0 ${live ? 'bg-green-500' : 'bg-rail-muted'}`} />
+        <span className={`w-2 h-2 rounded-full shrink-0 ${live ? 'bg-green-500' : 'bg-status-inactive'}`} />
       </div>
       {(big || live) && (
         <div className="relative flex justify-between gap-2 text-white">

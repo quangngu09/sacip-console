@@ -30,7 +30,7 @@ export default function Policies() {
 
   return (
     <div>
-      <PageHeader icon="policy" title="Rule & Chính sách" desc="Middleware Policy Engine (PDP) • Đối tượng + Không gian + Thời gian → Hành động. Giao diện hóa 100%, không cấu hình cứng trong code."
+      <PageHeader icon="policy" title="Quy tắc & chính sách" desc="Middleware Policy Engine (PDP) • Đối tượng + Không gian + Thời gian → Hành động. Giao diện hóa 100%, không cấu hình cứng trong code."
         actions={<button className="btn-primary" onClick={() => setEditor(true)}><Icon name="add" />Tạo rule</button>} />
 
       <div className="grid grid-cols-2 gap-space-md mb-space-md">
@@ -38,14 +38,14 @@ export default function Policies() {
         <div className="card p-space-md border-l-4 border-l-primary-container"><div className="flex items-center gap-2 text-label-md font-semibold"><Icon name="menu_book" className="text-primary-container" />Read-only / Audit Logs</div><p className="text-caption text-text-secondary mt-1">Điểm danh PRESENT/LATE, nhật ký ra vào phòng làm việc, heatmap mật độ — phục vụ thống kê & thanh tra.</p></div>
       </div>
 
-      <div className="card overflow-hidden">
-        <table className="w-full text-left text-body-sm">
-          <thead className="bg-surface-bright"><tr className="h-10 text-[12px] uppercase tracking-wider text-text-secondary">
-            {['ID', 'Tên rule', 'Đối tượng', 'Không gian', 'Thời gian', 'Hành động', 'Loại', 'Lượt khớp (30 ngày)', 'Bật'].map((h) => <th key={h} className="px-3 font-medium">{h}</th>)}
+      <div className="card overflow-x-auto">
+        <table className="data-table">
+          <thead><tr>
+            {['ID', 'Tên rule', 'Đối tượng', 'Không gian', 'Thời gian', 'Hành động', 'Loại', 'Lượt khớp (30 ngày)', 'Bật'].map((h) => <th key={h}>{h}</th>)}
           </tr></thead>
           <tbody>
             {rules.map((r) => (
-              <tr key={r.id} className="h-12 border-t border-border-subtle/60 hover:bg-surface-container-low">
+              <tr key={r.id} className="h-12 hover:bg-surface-container-low">
                 <td className="px-3 font-mono text-caption whitespace-nowrap">{r.id}</td>
                 <td className="px-3 font-medium">{r.name}</td>
                 <td className="px-3">{r.group}</td>
@@ -94,7 +94,7 @@ export default function Policies() {
         </div>
         <div className="p-space-md bg-surface-bright border-t border-border-subtle flex justify-end gap-2">
           <button className="btn-outline" onClick={() => save(false)}>Lưu ở chế độ Dry-Run</button>
-          <button className="btn-primary disabled:opacity-40" disabled={!dry || dry.conflicts > 0} title={!dry ? 'Cần chạy Dry-Run trước' : ''} onClick={() => save(true)}><Icon name="check" />Áp dụng thật</button>
+          <button className="btn-primary" disabled={!dry || dry.conflicts > 0} title={!dry ? 'Cần chạy Dry-Run trước' : ''} onClick={() => save(true)}><Icon name="check" />Áp dụng thật</button>
         </div>
       </Modal>
 

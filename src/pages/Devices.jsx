@@ -13,7 +13,7 @@ export default function Devices() {
 
   return (
     <div>
-      <PageHeader icon="videocam" title="Thiết bị (CMDB)" desc="Hệ thống Quản lý Tài sản & Hạ tầng • IP, MAC, Port Switch PoE, Serial, trạng thái Online/Offline, đồng bộ NTP"
+      <PageHeader icon="videocam" title="Thiết bị" desc="Hệ thống Quản lý Tài sản & Hạ tầng • IP, MAC, Port Switch PoE, Serial, trạng thái Online/Offline, đồng bộ NTP"
         actions={<><button className="btn-outline" onClick={() => { setDevices((ds) => ds.map((d) => ({ ...d, ntp: d.kind.includes('BLE') ? d.ntp : true }))); log('Đồng bộ NTP toàn bộ thiết bị', 'CMDB'); toast('Đã đồng bộ NTP', 'Thời gian thiết bị khớp máy chủ (lệch < 5ms).', 'success'); }}><Icon name="schedule" />Đồng bộ NTP</button><button className="btn-primary"><Icon name="add" />Khai báo thiết bị</button></>} />
 
       <div className="grid grid-cols-4 gap-space-md mb-space-md">
@@ -27,13 +27,13 @@ export default function Devices() {
       </div>
 
       <div className="card overflow-x-auto">
-        <table className="w-full text-left text-body-sm">
-          <thead className="bg-surface-bright sticky top-0"><tr className="h-10 text-[12px] uppercase tracking-wider text-text-secondary">
-            {['Device ID', 'Loại', 'Hãng', 'IP', 'MAC / BSSID / UUID', 'Port Switch', 'Serial', 'Room_ID', 'Trạng thái', 'NTP', 'Thao tác'].map((h) => <th key={h} className="px-3 font-medium whitespace-nowrap">{h}</th>)}
+        <table className="data-table">
+          <thead><tr>
+            {['Device ID', 'Loại', 'Hãng', 'IP', 'MAC / BSSID / UUID', 'Port Switch', 'Serial', 'Room_ID', 'Trạng thái', 'NTP', 'Thao tác'].map((h) => <th key={h}>{h}</th>)}
           </tr></thead>
           <tbody>
             {rows.map((d) => (
-              <tr key={d.id} className="h-12 border-t border-border-subtle/60 hover:bg-surface-container-low">
+              <tr key={d.id} className="h-12 hover:bg-surface-container-low">
                 <td className="px-3 font-mono font-semibold whitespace-nowrap">{d.id}</td>
                 <td className="px-3 whitespace-nowrap">{d.kind}</td>
                 <td className="px-3">{d.vendor}</td>
@@ -52,7 +52,7 @@ export default function Devices() {
           </tbody>
         </table>
       </div>
-      <p className="text-caption text-text-secondary mt-2">Thiết bị chỉ được gán vào phòng đã duyệt hạ tầng — thực hiện tại trang Không gian & Zone.</p>
+      <p className="text-caption text-text-secondary mt-2">Thiết bị chỉ được gán vào phòng đã duyệt hạ tầng — thực hiện tại trang Không gian & khu vực.</p>
     </div>
   );
 }
