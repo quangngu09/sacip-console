@@ -1,384 +1,289 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Icon, Chip, FaceThumb, Modal, ConfirmReason, AiCard, Empty } from '../components/ui';
+import { Link, useSearchParams } from 'react-router-dom';
+import { AiCard, Banner, Chip, ConfirmReason, DataBoundary, Empty, FaceThumb, Icon, PageHeader, SearchInput, Select, SourceBadge, StateBadge, SubjectTypeChip, Tabs, useCountdown } from '../components/ui';
 import { useApp } from '../store';
-import { CURRENT_USER } from '../data/mock';
+import { approveRequest, cancelRequest, policyFor, rejectRequest, requestOriginalImage } from '../api/client';
+import { REQUEST_STATUS, REQUEST_TYPE, TRIGGER_TARGET, consentLabel } from '../api/enums';
+import { fmtDateTime, fmtPercent, fmtRelative, slaState } from '../lib/format';
+import { contextLine } from './Profiles';
 
+// Một hàng đợi chung cho mọi loại yêu cầu, lọc nhanh bằng tab trạng thái (Đặc tả IAM §2.3).
 const TABS = [
-  ['all', 'Tất cả'], ['pending', 'Chờ duyệt'], ['approved', 'Đã duyệt'], ['rejected', 'Từ chối'], ['cancelled', 'Đã hủy'],
+  { key: 'pending', label: 'Chờ duyệt', tone: 'status-pending' },
+  { key: 'rejected', label: 'Đã từ chối' },
+  { key: 'completed', label: 'Đã hoàn thành' },
+  { key: 'cancelled', label: 'Đã hủy' },
+  { key: 'all', label: 'Tất cả' },
 ];
-const kindColor = { rescan: 'primary', new: 'neutral', revoke: 'status-rejected', consent: 'secondary', extend: 'neutral' };
-const prioColor = { 'Khẩn cấp': 'bg-status-rejected text-white', Cao: 'bg-status-rejected/10 text-status-rejected' };
+const TYPE_FILTER = [{ value: 'all', label: 'Mọi loại yêu cầu' }, ...Object.entries(REQUEST_TYPE).map(([value, m]) => ({ value, label: m.label }))];
+const PRIORITY = { URGENT: ['bg-status-rejected text-white', 'Khẩn cấp'], HIGH: ['bg-status-rejected/10 text-status-rejected', 'Cao'], LEGAL: ['bg-secondary-fixed text-on-secondary-fixed-variant', 'Pháp lý'] };
 
 export default function Requests() {
-  const { requests, setRequests, log, toast } = useApp();
-  const [tab, setTab] = useState('all');
+  const { data } = useApp();
+  const [params, setParams] = useSearchParams();
+  const [tab, setTab] = useState('pending');
+  const [type, setType] = useState('all');
   const [q, setQ] = useState('');
-  const [sel, setSel] = useState('YC-2025-0842');
-  const [approveOpen, setApproveOpen] = useState(false);
-  const [rejectOpen, setRejectOpen] = useState(false);
-  const [forwardOpen, setForwardOpen] = useState(false);
+  const sel = params.get('id');
+  const subjectOf = (r) => data.subjects.find((s) => s.subject_id === r.subject_id);
 
-  const counts = useMemo(() => Object.fromEntries(TABS.map(([k]) => [k, k === 'all' ? requests.length : requests.filter((r) => r.status === k).length])), [requests]);
-  const list = requests.filter((r) => tab === 'all' || r.status === tab).filter((r) => !q || `${r.id} ${r.name} ${r.subjectId}`.toLowerCase().includes(q.toLowerCase()));
-  const cur = requests.find((r) => r.id === sel);
+  const counts = Object.fromEntries(TABS.map((t) => [t.key, t.key === 'all' ? data.requests.length : data.requests.filter((r) => r.status === t.key).length]));
+  const list = useMemo(() => data.requests
+    .filter((r) => tab === 'all' || r.status === tab)
+    .filter((r) => type === 'all' || r.request_type === type)
+    .filter((r) => { const s = subjectOf(r); return !q || `${r.request_id} ${s.name} ${s.code}`.toLowerCase().includes(q.toLowerCase()); })
+    .sort((a, b) => (a.status === 'pending' && b.status === 'pending' ? (a.sla_due || '').localeCompare(b.sla_due || '') : b.submitted_at.localeCompare(a.submitted_at))),
+  [data.requests, tab, type, q]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const update = (id, patch) => setRequests((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  // Khi mở bằng liên kết ?id=, chuyển đúng tab của yêu cầu đó.
+  useEffect(() => {
+    const r = sel && data.requests.find((x) => x.request_id === sel);
+    if (r && tab !== 'all' && r.status !== tab) setTab(r.status);
+  }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const cur = data.requests.find((r) => r.request_id === sel && (tab === 'all' || r.status === tab)) || list[0];
+  const select = (id) => setParams({ id });
 
   return (
-    <div className="flex flex-col gap-space-md">
-      <div className="card p-space-md flex items-center justify-between gap-3">
-        <div className="flex items-center gap-space-sm min-w-0">
-          <div className="w-9 h-9 rounded-lg bg-surface-container flex items-center justify-center text-primary-container"><Icon name="inbox" size={22} /></div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-headline-md">Hộp yêu cầu phê duyệt</h1>
-              <Chip color="status-pending" className="text-label-sm">{counts.pending} việc cần làm</Chip>
-              <Chip color="ai" icon="bolt" className="text-label-sm">SLA trung bình 1.8h</Chip>
-            </div>
-            <p className="text-caption text-text-secondary truncate">Chuỗi phê duyệt nhiều bước theo Nghị định 13/2023/NĐ-CP • Mọi quyết định do con người ký số</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1 bg-surface-container-low px-2.5 py-1.5 rounded-lg text-caption text-text-secondary"><Icon name="sync" size={16} className="text-status-active" />Đồng bộ Kiosk: <b>Vừa xong</b></span>
-          <button className="btn-ghost"><Icon name="tune" />Bộ lọc nâng cao</button>
-          <button className="btn-ghost"><Icon name="history" />Lịch sử ca trực</button>
-        </div>
-      </div>
+    <div className="page-fill flex flex-col">
+      <PageHeader title="Hộp yêu cầu" badge={counts.pending > 0 && <Chip color="status-pending">{counts.pending} việc cần làm</Chip>}
+        desc="Mọi loại yêu cầu trong một hàng đợi • Chuỗi duyệt lấy từ chính sách của từng loại đối tượng • Từ chối bắt buộc nêu lý do" />
 
-      <div className="grid grid-cols-12 gap-space-md items-start">
-        {/* LEFT list */}
-        <div className="col-span-5 card overflow-hidden flex flex-col">
-          <div className="p-space-md pb-0">
-            <div className="flex items-center gap-1 border-b border-border-subtle pb-2 overflow-x-auto">
-              {TABS.map(([k, l]) => (
-                <button key={k} onClick={() => setTab(k)} className={`px-2.5 py-1.5 rounded-lg text-label-sm shrink-0 flex items-center gap-1.5 ${tab === k ? 'bg-primary-container text-white' : 'text-text-secondary hover:bg-surface-container-low hover:text-text-primary'}`}>
-                  {l}<span className={`px-1.5 rounded-full text-caption font-semibold ${tab === k ? 'bg-white/20' : 'bg-surface-container'}`}>{counts[k]}</span>
-                </button>
-              ))}
+      <DataBoundary name="requests" label="hộp yêu cầu" fill skeleton="bar-split">
+        <div className="card shrink-0 mb-space-md"><Tabs label="Trạng thái yêu cầu" className="px-2" value={tab} onChange={(t) => { setTab(t); setParams({}); }} items={TABS.map((t) => ({ ...t, count: counts[t.key] }))} /></div>
+        <div className="flex-1 min-h-0 grid grid-cols-[400px_minmax(0,1fr)] gap-space-md">
+          <section className="card overflow-hidden flex flex-col min-h-0" aria-label="Danh sách yêu cầu">
+            <div className="p-3 border-b border-border-subtle flex gap-2 shrink-0">
+              <SearchInput className="flex-1 min-w-0" value={q} onChange={setQ} placeholder="Mã, tên, mã số" label="Tìm yêu cầu theo mã, tên, mã số" />
+              <Select className="!w-[160px]" label="Loại yêu cầu" value={type} onChange={setType} options={TYPE_FILTER} />
             </div>
-            <div className="py-2 relative">
-              <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
-              <input className="input pl-9 pr-8" placeholder="Tìm theo Mã YC, Họ tên, Mã SV..." value={q} onChange={(e) => setQ(e.target.value)} />
-              {q && <button className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-secondary" onClick={() => setQ('')}><Icon name="close" size={16} /></button>}
+            <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-border-subtle">
+              {list.length === 0 && <Empty title="Không có yêu cầu" desc="Hàng đợi trống với bộ lọc hiện tại." />}
+              {list.map((r) => {
+                const s = subjectOf(r);
+                const active = cur && r.request_id === cur.request_id;
+                const sla = r.status === 'pending' && slaState(r.sla_due);
+                return (
+                  <button key={r.request_id} onClick={() => select(r.request_id)} aria-current={active ? 'true' : undefined}
+                    className={`w-full text-left px-3.5 py-3 flex flex-col gap-1 transition-colors -outline-offset-2 ${active ? 'bg-primary-fixed shadow-[inset_3px_0_0_theme(colors.primary-container)]' : 'hover:bg-surface-container-low'}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-label-md font-semibold truncate ${r.status === 'cancelled' ? 'line-through text-text-secondary' : ''}`}>{s.name}</span>
+                      {r.status === 'pending'
+                        ? <span className={`shrink-0 flex items-center gap-1 text-caption whitespace-nowrap ${sla === 'over' || sla === 'soon' ? 'text-status-rejected font-semibold' : 'text-text-secondary'}`}><Icon name="schedule" size={14} />{sla === 'over' ? `Quá hạn ${fmtRelative(r.sla_due).replace(' trước', '')}` : fmtRelative(r.sla_due)}</span>
+                        : <Chip color={REQUEST_STATUS[r.status].color} className="shrink-0">{r.auto_approved ? 'AI tự duyệt' : REQUEST_STATUS[r.status].label}</Chip>}
+                    </div>
+                    <div className="flex items-center gap-2 text-caption text-text-secondary">
+                      <Icon name={REQUEST_TYPE[r.request_type].icon} size={14} />
+                      <span className="truncate"><span className="font-mono">{r.request_id}</span> • {REQUEST_TYPE[r.request_type].label} • {s.code}</span>
+                      {PRIORITY[r.priority] && <span className={`ml-auto shrink-0 px-1.5 rounded font-medium ${PRIORITY[r.priority][0]}`}>{PRIORITY[r.priority][1]}</span>}
+                    </div>
+                    <p className="text-body-sm text-text-secondary truncate">{r.reason_submitted}</p>
+                  </button>
+                );
+              })}
             </div>
-          </div>
-          <div className="divide-y divide-border-subtle max-h-[calc(100vh-280px)] overflow-y-auto">
-            {list.length === 0 && <Empty title="Không có yêu cầu" desc="Hộp yêu cầu trống với bộ lọc hiện tại." />}
-            {list.map((r) => {
-              const active = r.id === sel;
-              const closed = r.status !== 'pending';
-              return (
-                <button key={r.id} onClick={() => setSel(r.id)} className={`w-full text-left p-space-md flex flex-col gap-2 transition-colors border-l-4 ${active ? 'bg-surface-container-low border-l-primary-container' : 'border-l-transparent hover:bg-surface-container-low/50'} ${r.status === 'cancelled' ? 'opacity-70' : ''}`}>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-label-md font-semibold ${active ? 'text-primary-container' : ''} ${r.status === 'cancelled' ? 'line-through text-text-secondary' : ''}`}>{r.id}</span>
-                      <Chip color={kindColor[r.kind]}>{r.kindLabel}</Chip>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      {closed ? <StatusPill status={r.status} /> : <>
-                        <span className={`chip ${r.slaUrgent ? 'bg-status-rejected/10 text-status-rejected animate-pulse' : 'bg-surface-container text-text-secondary'}`}><Icon name="alarm" size={13} />{r.sla}</span>
-                        {prioColor[r.priority] && <span className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${prioColor[r.priority]}`}>{r.priority}</span>}
-                      </>}
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center font-semibold text-primary shrink-0">{r.initials}</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between gap-1"><span className="text-label-md font-semibold truncate">{r.name}</span><span className="text-caption text-text-secondary shrink-0">{r.time}</span></div>
-                      <p className="text-body-sm text-text-secondary truncate">{r.subjectId} • {r.unit}</p>
-                      <p className="text-caption text-text-secondary italic truncate">“{r.note}”</p>
-                    </div>
-                  </div>
-                  <div className="flex justify-between pt-1 text-caption text-text-secondary border-t border-border-subtle/60">
-                    {r.kind === 'consent' ? <span className="text-secondary font-medium flex items-center gap-1"><Icon name="verified_user" size={14} />Quyền tuyệt đối theo NĐ 13</span>
-                      : r.ai ? <span className="text-ai-border font-medium flex items-center gap-1"><Icon name="psychology" size={14} />AI gợi ý: {r.ai.confidence}% tin cậy</span> : <span />}
-                    <span>{r.status === 'cancelled' ? 'Thao tác đã đóng' : r.footer}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-          <div className="p-space-sm bg-surface-bright border-t border-border-subtle text-caption text-text-secondary flex justify-between"><span>Hiển thị {list.length} / {requests.length} yêu cầu</span><span>Trang 1 / 1</span></div>
-        </div>
+            <div className="h-10 px-3.5 border-t border-border-subtle text-caption text-text-secondary flex items-center shrink-0" aria-live="polite">Hiển thị {list.length} / {data.requests.length} yêu cầu</div>
+          </section>
 
-        {/* RIGHT detail */}
-        <div className="col-span-7 card overflow-hidden flex flex-col">
-          {!cur ? <Empty title="Chọn một yêu cầu" /> : cur.kind === 'consent'
-            ? <ConsentDetail r={cur} onDone={() => { update(cur.id, { status: 'approved', footer: 'Hoàn tất xóa dữ liệu' }); log('Xác nhận đã xử lý rút đồng ý (xóa ảnh + vector)', cur.subjectId); toast('Đã hoàn tất rút đồng ý', 'Ảnh gốc & vector 512d đã xóa; đã gửi biên bản cho sinh viên.', 'success'); }} />
-            : <ApprovalDetail r={cur} onApprove={() => setApproveOpen(true)} onReject={() => setRejectOpen(true)} onForward={() => setForwardOpen(true)}
-                onSimulateCancel={() => { update(cur.id, { status: 'cancelled' }); log('Đối tượng tự hủy yêu cầu qua App', cur.id, 'system'); toast('Yêu cầu đã bị đối tượng hủy', `${cur.id} — quyền chụp tự động thu hồi.`, 'warn'); }} />}
+          <section className="card overflow-hidden flex flex-col min-h-0" aria-label="Chi tiết yêu cầu">
+            {cur ? <RequestDetail key={cur.request_id} r={cur} s={subjectOf(cur)} /> : <Empty title="Chưa có yêu cầu để xem" desc="Chi tiết hiển thị khi có yêu cầu trong danh sách." />}
+          </section>
         </div>
-      </div>
-
-      {cur && <ApproveModal open={approveOpen} r={cur} onClose={() => setApproveOpen(false)} onConfirm={(reason) => {
-        if (cur.twoPerson && !cur.firstApproval) {
-          update(cur.id, { firstApproval: CURRENT_USER.name, footer: 'Chờ người thứ 2 xác nhận' });
-          log(`Xác nhận người thứ 1 — ${reason}`, cur.id);
-          toast('Đã ghi nhận xác nhận thứ nhất', 'Cần một cán bộ khác xác nhận để thực thi.', 'warn');
-        } else {
-          update(cur.id, { status: 'approved', footer: 'Đã phê duyệt' });
-          log(`Phê duyệt yêu cầu — ${reason}`, cur.id);
-          toast('Đã phê duyệt', `${cur.id} • Kiosk đã nhận token mở khóa & QR gửi tới App MyDaiNam.`, 'success');
-        }
-        setApproveOpen(false);
-      }} />}
-      <ConfirmReason open={rejectOpen} onClose={() => setRejectOpen(false)} danger title="Từ chối yêu cầu" subtitle={cur && `${cur.id} • ${cur.name}`} confirmLabel="Xác nhận từ chối"
-        onConfirm={(reason) => { update(cur.id, { status: 'rejected', footer: 'Đã từ chối' }); log(`Từ chối yêu cầu — ${reason}`, cur.id); toast('Đã từ chối yêu cầu', 'Đối tượng sẽ nhận thông báo kèm lý do.', 'info'); setRejectOpen(false); }} />
-      <ConfirmReason open={forwardOpen} onClose={() => setForwardOpen(false)} title="Chuyển cấp duyệt" subtitle={cur && cur.id} confirmLabel="Chuyển"
-        onConfirm={(reason) => { log(`Chuyển cấp duyệt — ${reason}`, cur.id); toast('Đã chuyển cấp duyệt', 'Yêu cầu chuyển tới Trưởng Phòng Đào tạo.', 'success'); setForwardOpen(false); }}>
-        <label className="flex flex-col gap-1 text-label-md font-semibold">Chuyển tới
-          <select className="input"><option>Trưởng Phòng Đào tạo</option><option>Phòng Pháp chế</option><option>Ban Quản lý KTX</option></select>
-        </label>
-      </ConfirmReason>
+      </DataBoundary>
     </div>
   );
 }
 
-function StatusPill({ status }) {
-  const m = { approved: ['status-active', 'Đã duyệt'], rejected: ['status-rejected', 'Từ chối'], cancelled: ['status-inactive', 'Đối tượng đã hủy'], pending: ['status-pending', 'Chờ duyệt'] }[status];
-  return <Chip color={m[0]}>{m[1]}</Chip>;
-}
+const Field = ({ label, children }) => <div className="min-w-0"><dt className="text-caption text-text-secondary">{label}</dt><dd className="min-w-0">{children}</dd></div>;
 
-function ApprovalDetail({ r, onApprove, onReject, onForward, onSimulateCancel }) {
-  const { log, toast } = useApp();
-  const [revealed, setRevealed] = useState(false);
-  const [revealAsk, setRevealAsk] = useState(false);
-  useEffect(() => setRevealed(false), [r.id]);
-  const closed = r.status !== 'pending';
-  const steps = [
-    { t: 'Bước 1: Đối tượng gửi yêu cầu', d: `${r.name} nộp đơn qua App MyDaiNam • xác thực OTP`, time: r.created },
-    { t: 'Bước 2: Cố vấn học tập / Trưởng đơn vị', d: 'ThS. Nguyễn Văn An: “Xác nhận cần cập nhật ảnh chuẩn để phục vụ điểm danh thi.”', time: '15:10 24/10/2025' },
-    { t: `Bước 3: Phòng Đào tạo${r.twoPerson ? ' (2 người xác nhận)' : ''}`, d: r.firstApproval ? `Đã có xác nhận thứ nhất: ${r.firstApproval}. Chờ cán bộ thứ 2.` : `Phân công thẩm định: ${CURRENT_USER.name}`, current: true },
-    { t: 'Bước 4: Tự động kích hoạt Kiosk & gửi QR', d: 'Hệ thống đẩy token mở khóa Kiosk 01, 02, 03 và gửi mã QR vào App MyDaiNam.' },
-  ];
-  const stepState = (i) => (r.status === 'approved' ? 'done' : r.status !== 'pending' ? (i < 2 ? 'done' : 'off') : i < r.step - 1 ? 'done' : i === r.step - 1 ? 'current' : 'off');
+const Metric = ({ label, value, sub, tone }) => (
+  <div className="p-3 bg-surface rounded-lg border border-border-subtle">
+    <div className="text-caption text-text-secondary">{label}</div>
+    <div className={`text-k-title-md ${tone}`}>{value}</div>
+    <div className="text-caption text-text-secondary">{sub}</div>
+  </div>
+);
+const tone = (ok, warn) => (ok ? 'text-status-active' : warn ? 'text-status-pending' : 'text-status-rejected');
+
+function RequestDetail({ r, s }) {
+  const { data, call, toast, can, actor } = useApp();
+  const [ask, setAsk] = useState(null);
+  const [signed, setSigned] = useState(null);
+  const left = useCountdown(signed?.expires_at, () => setSigned(null));
+  const pol = policyFor(s.subject_type);
+  const b = pol.config.biometric;
+  const pending = r.status === 'pending';
+  const isWithdraw = r.request_type === 'WITHDRAW_CONSENT';
+  const consentGate = s.states.consent !== 'ACTIVE' && !['WITHDRAW_CONSENT', 'REVOKE'].includes(r.request_type);
+  const stepIdx = r.approvals.findIndex((a) => !a.decision);
+  const lastStep = stepIdx === r.approvals.length - 1;
+  const awaitingSecond = r.two_person && lastStep && !!r.first_confirm;
+  const permOk = isWithdraw ? can('consent') : can('approve');
+  const sameAsFirst = awaitingSecond && r.first_confirm.by_id === actor.id;
+  const events = data.events.filter((e) => e.ref === r.request_id || (e.ref === s.code && e.at >= r.submitted_at)).sort((a, b2) => b2.at.localeCompare(a.at));
+  const sla = pending && slaState(r.sla_due);
+  const aiPass = r.ai && b.ai_auto_approve_enabled && r.ai.confidence >= b.ai_auto_approve_threshold;
+
+  const approveLabel = isWithdraw ? 'Xác nhận rút đồng ý' : r.two_person && lastStep ? (awaitingSecond ? 'Xác nhận người thứ 2' : 'Xác nhận người thứ 1') : lastStep ? 'Phê duyệt' : `Duyệt bước ${stepIdx + 1}`;
+
+  const outcome = {
+    RESCAN: `Mở quyền chụp lại qua ${b.rescan_channels.map((c) => (c === 'APP' ? 'App MyDaiNam' : 'Kiosk')).join(', ')} trong ${b.rescan_validity_hours} giờ, ${b.rescan_max_uses} lần; gửi thông báo tới người gửi.`,
+    NEW_REGISTRATION: `Kích hoạt hiệu lực Face ID; ${s.subject_type === 'STUDENT' ? 'báo Hệ thống Đào tạo trạng thái VERIFIED; ' : ''}nạp dữ liệu xuống thiết bị kiểm soát ra vào.`,
+    REVOKE: 'Thu hồi quyền nhận diện tại mọi cổng và camera ngay lập tức.',
+    EXTEND: 'Gia hạn hiệu lực đến 31/12/2027 và cập nhật thiết bị kiểm soát ra vào.',
+    WITHDRAW_CONSENT: `Khóa tại mọi thiết bị, rồi xóa ảnh gốc và dữ liệu sinh trắc trong ${pol.config.workflow.retention_days_after_withdraw} ngày theo ${pol.policy_id}; gửi biên bản xác nhận cho người gửi.`,
+  }[r.request_type];
+
+  const run = async (kind, reason) => {
+    try {
+      if (kind === 'approve') {
+        const res = await call(approveRequest, r.request_id, reason);
+        if (res.stage === 'FIRST_CONFIRM') toast('Đã ghi nhận xác nhận thứ nhất', 'Cần một cán bộ khác xác nhận. Đổi vai trò ở góc trên bên phải để mô phỏng.', 'warn');
+        else if (res.stage === 'STEP') toast(`Đã duyệt bước ${stepIdx + 1}`, `Chuyển tới: ${r.approvals[stepIdx + 1].label}.`, 'success');
+        else toast(isWithdraw ? 'Đã xác nhận rút đồng ý' : 'Đã phê duyệt', `${r.request_id}: đã gửi ${res.events.length} sự kiện sang hệ thống khác.`, 'success');
+      }
+      if (kind === 'reject') { await call(rejectRequest, r.request_id, reason); toast('Đã từ chối', 'Lý do đã được gửi về App MyDaiNam cho người gửi.', 'info'); }
+      if (kind === 'reveal') { setSigned(await call(requestOriginalImage, s.subject_id, reason)); toast('Đã mở ảnh gốc trong 60 giây', 'Lượt xem đã ghi nhật ký.', 'warn'); }
+    } catch (e) { toast('Không thực hiện được', e.message, 'error'); }
+    setAsk(null);
+  };
 
   return (
     <>
-      <div className="p-space-md border-b border-border-subtle flex flex-col gap-space-sm">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2"><span className="text-headline-md">{r.id}</span>{r.status === 'pending' ? <Chip color="status-pending" className="text-label-sm">Đang chờ Phòng Đào tạo duyệt</Chip> : <StatusPill status={r.status} />}</div>
-          <div className="flex gap-1 text-text-secondary">
-            <button className="p-1.5 rounded-lg hover:bg-surface-container-low" title="In phiếu xác nhận"><Icon name="print" size={20} /></button>
-            <button className="p-1.5 rounded-lg hover:bg-surface-container-low" title="Sao chép liên kết"><Icon name="share" size={20} /></button>
-          </div>
+      <header className="px-space-md py-3 border-b border-border-subtle shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <h2 className="text-k-title-md truncate">{s.name}</h2><SubjectTypeChip type={s.subject_type} />
+          <Chip color={REQUEST_STATUS[r.status].color} className="ml-auto shrink-0">{r.auto_approved ? 'AI tự duyệt' : REQUEST_STATUS[r.status].label}</Chip>
         </div>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-caption text-text-secondary">
-          <span className="flex items-center gap-1"><Icon name="category" size={16} />Loại: <b>{r.kindLabel}</b></span>
-          <span className="flex items-center gap-1"><Icon name="schedule" size={16} />Tạo lúc: {r.created}</span>
-          {!closed && <span className="flex items-center gap-1 text-status-pending font-medium"><Icon name="hourglass_top" size={16} />SLA: <b>{r.sla}</b></span>}
+        <div className="mt-0.5 flex flex-wrap gap-x-3 text-caption text-text-secondary">
+          <span><span className="font-mono">{r.request_id}</span> • {REQUEST_TYPE[r.request_type].label}</span>
+          <span>Gửi lúc {fmtDateTime(r.submitted_at)} qua {r.channel === 'APP' ? 'App MyDaiNam' : r.channel === 'COUNTER' ? 'quầy đăng ký' : 'Console'}</span>
+          <span>Theo {r.policy_ref.policy_id} {r.policy_ref.version}</span>
+          {pending && <span className={`font-medium ${sla === 'ok' ? 'text-status-pending' : 'text-status-rejected'}`}>{sla === 'over' ? 'Đã quá hạn xử lý' : `Hạn xử lý: ${fmtRelative(r.sla_due)}`}</span>}
         </div>
-      </div>
+      </header>
 
-      <div className="p-space-md flex flex-col gap-space-lg max-h-[calc(100vh-330px)] overflow-y-auto">
-        {r.status === 'cancelled' && (
-          <div className="p-3.5 rounded-lg bg-status-pending/10 border border-status-pending/30 flex gap-3 text-body-sm"><Icon name="warning" size={22} className="text-status-pending" /><div><b className="text-status-pending">Đối tượng đã hủy yêu cầu.</b> Mọi thao tác cấp quyền đã bị khóa; quyền chụp tự động thu hồi.</div></div>
-        )}
+      <div className="flex-1 min-h-0 overflow-y-auto p-space-md flex flex-col gap-space-md">
+        {r.auto_approved && <Banner icon="smart_toy" title="AI tự duyệt.">Điểm {fmtPercent(r.ai.confidence)} đạt ngưỡng tự duyệt của {r.policy_ref.policy_id} {r.policy_ref.version}. Lượt này được ghi nhật ký với mã AUTO_APPROVE_FACE_ID. AI không có quyền tự từ chối hay thu hồi.</Banner>}
+        {r.status === 'rejected' && <Banner tone="danger" icon="block" title="Lý do từ chối (công khai, đã gửi về App):">{r.rejection_reason}<div className="text-caption text-text-secondary mt-1">{r.approver_id} • {fmtDateTime(r.approved_at)}</div></Banner>}
+        {r.status === 'completed' && !r.auto_approved && <Banner icon="task_alt" title="Đã hoàn thành.">Người duyệt cuối: {r.approver_id} lúc {fmtDateTime(r.approved_at)}.</Banner>}
+        {r.status === 'cancelled' && <Banner tone="warn" title="Người gửi đã hủy yêu cầu trên App.">Không còn thao tác nào cho yêu cầu này.</Banner>}
+        {pending && consentGate && <Banner tone="danger" icon="lock">{s.name} chưa có đồng ý hợp lệ. Có thể từ chối, nhưng phê duyệt sẽ bị chặn cho đến khi người này xác nhận điều khoản.</Banner>}
+
         <section className="flex flex-col gap-3">
-          <div className="flex justify-between"><h2 className="section-title">1. Thông tin đối tượng & lý do</h2><Chip color="ai">Hồ sơ chuẩn ICAO 9303</Chip></div>
-          <div className="bg-surface-bright p-space-md rounded-lg flex gap-space-md items-start">
-            <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-3 text-body-sm">
-              <Field label="Họ và tên" value={<b className="text-body-md">{r.name}</b>} />
-              <Field label="Mã đối tượng" value={<b className="text-primary-container font-mono">{r.subjectId}</b>} />
-              <Field label="Đơn vị" value={`${r.unit}${r.cls ? ` • ${r.cls}` : ''}`} />
-              <Field label="Đối chiếu CCCD" value={<span className="font-mono text-caption">••••••••8921 (Đã xác thực chip)</span>} />
-              <div className="col-span-2 pt-2 border-t border-border-subtle">
-                <span className="text-caption text-text-secondary block mb-1">Nội dung đề nghị:</span>
-                <div className="p-2.5 rounded bg-surface leading-relaxed border-l-2 border-l-primary-container">“{r.note}”</div>
+          <h3 className="text-headline-md">Đối tượng và lý do</h3>
+          <div className="flex gap-space-md items-start">
+            <dl className="flex-1 grid grid-cols-2 gap-x-4 gap-y-3 text-body-sm">
+              <Field label="Mã"><span className="font-mono">{s.code}</span> • <Link to="/ho-so" className="text-primary-container hover:underline">Hồ sơ</Link></Field>
+              <Field label="Ngữ cảnh">{contextLine(s)}</Field>
+              <Field label="Nguồn Face ID"><SourceBadge source={s.source} poses={s.source && s.poses.length} /></Field>
+              <Field label="Đồng ý"><StateBadge dim="consent" value={s.states.consent} label={consentLabel(s)} /></Field>
+              <div className="col-span-2">
+                <dt className="text-caption text-text-secondary mb-1">Lý do người gửi nhập</dt>
+                <dd className="p-2.5 rounded bg-surface-bright leading-relaxed border-l-2 border-l-primary-container">“{r.reason_submitted}”</dd>
               </div>
-            </div>
-            <div className="w-52 shrink-0 flex flex-col gap-2">
-              <div className="text-caption text-text-secondary font-medium flex justify-between"><span>Ảnh hiện tại</span>{r.ai && <span className={r.ai.quality < 70 ? 'text-status-rejected font-semibold' : 'text-status-active font-semibold'}>Chỉ số: {r.ai.quality}%</span>}</div>
-              <div className="relative h-44 rounded-lg overflow-hidden bg-inverse-surface flex items-center justify-center">
-                <div className="absolute inset-0 flex items-center justify-center"><FaceThumb seed={r.id.length + 2} size={176} round={false} revealed={revealed} /></div>
-                {!revealed && (
-                  <div className="absolute inset-0 bg-slate-900/60 flex flex-col items-center justify-center p-3 text-center">
-                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white mb-2"><Icon name="visibility_off" /></div>
-                    <span className="text-white text-[11px] font-medium mb-2.5">Hình ảnh sinh trắc được mã hóa bảo mật</span>
-                    <button className="px-2.5 py-1 bg-surface text-[11px] font-semibold rounded shadow flex items-center gap-1" onClick={() => setRevealAsk(true)}><Icon name="remove_red_eye" size={14} />Xem rõ (sẽ được ghi log)</button>
-                    <span className="text-slate-300 text-[10px] mt-1.5 flex items-center gap-0.5"><Icon name="shield" size={10} />Admin ID: {CURRENT_USER.id}</span>
-                  </div>
-                )}
+            </dl>
+            {s.poses.length > 0 && (
+              <div className="w-40 shrink-0 flex flex-col items-center gap-1.5">
+                <FaceThumb seed={s.seed} size={140} round={false} revealed={left > 0} />
+                {left > 0
+                  ? <button className="btn-outline btn-sm w-full" onClick={() => setSigned(null)}>Làm mờ lại ({left} giây)</button>
+                  : <button className="btn-outline btn-sm w-full" disabled={s.states.consent !== 'ACTIVE' || !can('view_original')} onClick={() => setAsk('reveal')}><Icon name="visibility" size={16} />Xem ảnh gốc</button>}
               </div>
-              <span className="text-[11px] text-text-secondary text-center">Trạm chụp: Kiosk #03 • 09:14 24/10/2025</span>
-            </div>
+            )}
           </div>
         </section>
 
-        {r.ai && (
+        {r.ai && !isWithdraw && (
           <AiCard>
-            <div className="flex justify-end -mt-8 mb-2"><span className="px-2 py-0.5 rounded bg-ai-border/10 text-ai-border text-[11px] font-semibold">Độ tin cậy mô hình: {r.ai.confidence}%</span></div>
-            <div className="grid grid-cols-3 gap-space-sm">
-              <Metric label="Chất lượng ảnh trực diện" value={`${r.ai.quality} / 100`} good={r.ai.quality >= 85} warn={r.ai.quality >= 60} sub={r.ai.quality < 85 ? 'Specular glare trán 38% • Lệch yaw 22°' : 'Đạt chuẩn ICAO'} />
-              <Metric label="Khớp khuôn mặt CCCD" value={`${r.ai.match}%`} good={r.ai.match >= 90} sub={r.ai.match >= 90 ? 'Không phát hiện mạo danh' : 'Độ khớp thấp'} />
-              <Metric label="Liveness / Deepfake" value={r.ai.liveness >= 90 ? 'PASS' : 'FAIL'} good={r.ai.liveness >= 90} sub={`${r.ai.liveness}% người thật`} />
+            <div className="grid grid-cols-3 gap-2">
+              <Metric label="Chất lượng ảnh" value={`${r.ai.quality}/100`} tone={tone(r.ai.quality >= b.min_quality, r.ai.quality >= 70)} sub={`Ngưỡng tối thiểu ${b.min_quality}`} />
+              <Metric label="Khớp ảnh CCCD / hồ sơ cũ" value={fmtPercent(r.ai.match)} tone={tone(r.ai.match >= 90, r.ai.match >= 80)} sub={r.ai.match >= 90 ? 'Cùng một người' : 'Cần đối chiếu thêm'} />
+              <Metric label="Kiểm tra người thật" value={r.ai.liveness >= 90 ? 'Đạt' : 'Không đạt'} tone={tone(r.ai.liveness >= 90)} sub={fmtPercent(r.ai.liveness)} />
             </div>
-            <div className="mt-3 p-2.5 bg-surface/80 rounded text-body-sm leading-relaxed border-l-2 border-l-ai-border"><b>Nhận định hệ thống:</b> {r.ai.verdict}</div>
+            <p className="mt-2 text-body-sm">
+              {b.ai_auto_approve_enabled
+                ? aiPass ? `Điểm ${fmtPercent(r.ai.confidence)} đạt ngưỡng tự duyệt ${b.ai_auto_approve_threshold}%.` : `Điểm ${fmtPercent(r.ai.confidence)} thấp hơn ngưỡng tự duyệt ${b.ai_auto_approve_threshold}% nên cần người duyệt.`
+                : `${pol.policy_id} không bật AI tự duyệt; người duyệt quyết định.`}
+              {r.ai.liveness < 90 && ' Có dấu hiệu dùng ảnh in hoặc màn hình.'}
+            </p>
           </AiCard>
         )}
 
-        <section className="flex flex-col gap-3">
-          <h2 className="section-title">2. Tiến trình phê duyệt</h2>
-          <div className="relative pl-7 space-y-4 before:content-[''] before:absolute before:left-[9px] before:top-2 before:bottom-2 before:w-0.5 before:bg-border-subtle">
-            {steps.map((s, i) => {
-              const st = stepState(i);
+        <section className="flex flex-col gap-2">
+          <h3 className="text-headline-md">Chuỗi phê duyệt</h3>
+          <ol className="relative pl-7 flex flex-col gap-3 before:content-[''] before:absolute before:left-[9px] before:top-2 before:bottom-2 before:w-0.5 before:bg-border-subtle">
+            <li className="relative"><span className="absolute -left-7 mt-0.5 w-5 h-5 rounded-full flex items-center justify-center ring-4 ring-surface bg-status-active text-white"><Icon name="check" size={13} /></span>
+              <div className="p-2.5 rounded-lg bg-surface-bright"><div className="flex justify-between gap-2"><span className="text-label-md font-semibold">Người gửi yêu cầu</span><span className="text-caption text-text-secondary">{fmtDateTime(r.submitted_at)}</span></div></div></li>
+            {r.auto_approved && <li className="relative"><span className="absolute -left-7 mt-0.5 w-5 h-5 rounded-full flex items-center justify-center ring-4 ring-surface bg-status-active text-white"><Icon name="smart_toy" size={13} /></span>
+              <div className="p-2.5 rounded-lg bg-surface-bright"><div className="flex justify-between gap-2"><span className="text-label-md font-semibold">AI tự duyệt</span><span className="text-caption text-text-secondary">{fmtDateTime(r.approved_at)}</span></div></div></li>}
+            {r.approvals.map((a, i) => {
+              const state = a.decision === 'APPROVED' ? 'done' : a.decision === 'REJECTED' ? 'rejected' : pending && i === stepIdx ? 'current' : 'off';
               return (
-                <div key={i} className={`relative ${st === 'off' ? 'opacity-60' : ''}`}>
-                  <span className={`absolute -left-7 mt-0.5 w-5 h-5 rounded-full flex items-center justify-center ring-4 ring-surface ${st === 'done' ? 'bg-status-active text-white' : st === 'current' ? 'bg-primary-container text-white' : 'bg-surface-container-high text-text-secondary'}`}>
-                    <Icon name={st === 'done' ? 'check' : st === 'current' ? 'edit' : 'lock_clock'} size={13} />
+                <li key={i} className={`relative ${state === 'off' ? 'opacity-60' : ''}`}>
+                  <span className={`absolute -left-7 mt-0.5 w-5 h-5 rounded-full flex items-center justify-center ring-4 ring-surface ${state === 'done' ? 'bg-status-active text-white' : state === 'rejected' ? 'bg-status-rejected text-white' : state === 'current' ? 'bg-primary-container text-white' : 'bg-surface-container-high text-text-secondary'}`}>
+                    <Icon name={state === 'done' ? 'check' : state === 'rejected' ? 'close' : state === 'current' ? 'edit' : 'more_horiz'} size={13} />
                   </span>
-                  <div className={`p-3 rounded-lg ${st === 'current' ? 'bg-surface ring-1 ring-primary-container' : 'bg-surface-bright'}`}>
+                  <div className={`p-2.5 rounded-lg ${state === 'current' ? 'bg-surface ring-1 ring-primary-container' : 'bg-surface-bright'}`}>
                     <div className="flex justify-between gap-2">
-                      <span className={`text-label-md font-semibold ${st === 'current' ? 'text-primary-container' : ''}`}>{s.t}</span>
-                      {st === 'current' ? <Chip color="status-pending">Chờ bạn phê duyệt</Chip> : s.time && <span className="text-caption text-text-secondary">{s.time}</span>}
+                      <span className={`text-label-md font-semibold ${state === 'current' ? 'text-primary-container' : ''}`}>Bước {i + 1}: {a.label}</span>
+                      {a.approved_at ? <span className="text-caption text-text-secondary">{a.approver_id} • {fmtDateTime(a.approved_at)}</span> : state === 'current' && <Chip color="status-pending">Đang chờ</Chip>}
                     </div>
-                    <p className="text-body-sm text-text-secondary mt-0.5">{s.d}</p>
+                    {a.note && <p className="text-body-sm text-text-secondary mt-0.5">“{a.note}”</p>}
+                    {state === 'current' && r.two_person && lastStep && (
+                      <p className="text-body-sm mt-1">{r.first_confirm ? <>Đã có xác nhận thứ nhất: <b>{r.first_confirm.by}</b> ({fmtDateTime(r.first_confirm.at)}). Cần một cán bộ khác xác nhận.</> : 'Cần 2 cán bộ khác nhau xác nhận.'}</p>
+                    )}
                   </div>
-                </div>
+                </li>
               );
             })}
-          </div>
+          </ol>
+          {pending && <p className="text-caption text-text-secondary">Khi hoàn tất: {outcome}</p>}
         </section>
 
-        <section className="pt-2 border-t border-border-subtle">
-          <div className="flex justify-between text-caption mb-2"><span className="font-semibold text-text-secondary uppercase">Nhật ký truy vết (Audit Trail)</span><span className="text-primary-container">Xem toàn bộ tại Nhật ký & Báo cáo</span></div>
-          <div className="bg-surface-bright rounded p-2.5 text-caption font-mono text-text-secondary space-y-1.5">
-            <div>[14:20:12] BIO-CLIENT KIOSK_03: Capture failed (specular highlight &gt; 35%)</div>
-            <div>[14:20:45] REQUEST-SUBMIT: {r.subjectId} tạo {r.id}</div>
-            <div className="text-ai-border">[14:21:03] AI-ENGINE: confidence {r.ai?.confidence ?? '—'}% (chỉ gợi ý)</div>
+        {events.length > 0 && (
+          <section>
+            <h3 className="text-headline-md mb-2">Sự kiện đã gửi sang hệ thống khác</h3>
+            <ul className="flex flex-col divide-y divide-border-subtle border border-border-subtle rounded">
+              {events.map((e) => (
+                <li key={e.event_id} className="px-3 py-2 text-body-sm flex items-start gap-2">
+                  <Icon name={TRIGGER_TARGET[e.target].icon} size={16} className="mt-0.5 text-primary-container" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2"><span className="font-medium">{TRIGGER_TARGET[e.target].label}</span><span className="font-mono text-caption text-text-secondary">{e.transport} • {e.destination}</span></div>
+                    <code className="block font-mono text-caption text-text-secondary truncate">{JSON.stringify(e.payload)}</code>
+                  </div>
+                  <Chip color={e.status === 'DELIVERED' ? 'status-active' : 'status-pending'}>{e.status === 'DELIVERED' ? 'Đã gửi' : 'Đang thử lại'}</Chip>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
+
+      {pending && (
+        <footer className="px-space-md py-3 border-t border-border-subtle flex items-center gap-2 shrink-0">
+          {!isWithdraw && <button className="btn-danger" disabled={!permOk} onClick={() => setAsk('reject')}><Icon name="close" />Từ chối</button>}
+          {isWithdraw && <span className="text-caption text-text-secondary flex items-center gap-1"><Icon name="gavel" size={16} />Quyền rút đồng ý không thể bị từ chối.</span>}
+          <button className="btn text-text-secondary hover:bg-surface-container-low" title="Mô phỏng người gửi tự hủy trên App" onClick={async () => { await call(cancelRequest, r.request_id); toast('Người gửi đã hủy yêu cầu', r.request_id, 'warn'); }}><Icon name="smartphone" />Mô phỏng người gửi hủy</button>
+          <div className="ml-auto flex items-center gap-2">
+            {!permOk && <span className="text-caption text-text-secondary">Vai trò hiện tại không được duyệt.</span>}
+            {sameAsFirst && <span className="text-caption text-status-pending">Bạn đã xác nhận lần 1.</span>}
+            <button className="btn-primary" disabled={!permOk || sameAsFirst || consentGate} onClick={() => setAsk('approve')}><Icon name="check_circle" />{approveLabel}</button>
           </div>
-        </section>
-      </div>
+        </footer>
+      )}
 
-      <div className="p-space-md border-t border-border-subtle flex items-center justify-between gap-space-md mt-auto">
-        <div className="flex gap-2">
-          <button className="btn-outline" disabled={closed} onClick={onForward}><Icon name="forward" />Chuyển cấp</button>
-          <button className="btn border border-status-rejected/30 text-status-rejected hover:bg-status-rejected/10 disabled:opacity-40" disabled={closed} onClick={onReject}><Icon name="close" />Từ chối</button>
-        </div>
-        <div className="flex gap-2">
-          {!closed && <button className="btn text-text-secondary hover:text-text-primary" title="Mô phỏng: sinh viên tự hủy qua App" onClick={onSimulateCancel}><Icon name="smartphone" />Mô phỏng hủy</button>}
-          <button className="btn bg-primary-container text-white hover:bg-primary px-5 py-2 font-semibold disabled:opacity-40" disabled={closed} onClick={onApprove}>
-            <Icon name="check_circle" />{r.twoPerson ? (r.firstApproval ? 'Xác nhận người thứ 2' : 'Xác nhận người thứ 1') : 'Phê duyệt yêu cầu'}
-          </button>
-        </div>
-      </div>
-
-      <ConfirmReason open={revealAsk} onClose={() => setRevealAsk(false)} title="Xem rõ ảnh khuôn mặt" subtitle={`${r.name} • ${r.subjectId}`} minLength={5}
-        onConfirm={(reason) => { setRevealed(true); setRevealAsk(false); log(`Xem rõ ảnh khuôn mặt — ${reason}`, r.subjectId, 'sensitive'); toast('Đã giải mờ ảnh', 'Thao tác đã được ghi log.', 'warn'); }} />
-    </>
-  );
-}
-
-const Field = ({ label, value }) => <div><span className="text-caption text-text-secondary block">{label}</span><span>{value}</span></div>;
-const Metric = ({ label, value, sub, good, warn }) => {
-  const c = good ? 'text-status-active' : warn ? 'text-status-pending' : 'text-status-rejected';
-  return (
-    <div className="p-2.5 bg-surface rounded flex flex-col gap-1 shadow-soft">
-      <span className="text-caption text-text-secondary">{label}</span>
-      <span className={`text-headline-md font-bold ${c}`}>{value}</span>
-      <span className="text-[11px] text-text-secondary">{sub}</span>
-    </div>
-  );
-};
-
-function ApproveModal({ open, r, onClose, onConfirm }) {
-  const [reason, setReason] = useState('');
-  const [sms, setSms] = useState(true);
-  const [keep, setKeep] = useState(true);
-  useEffect(() => { if (open) setReason(r.kind === 'rescan' ? 'Chấp thuận theo đề xuất của Cố vấn học tập. Ảnh cũ Kiosk 03 bị specular highlight và lệch yaw 22 độ. Mở quyền chụp lại tại Kiosk 01 trong 48 giờ.' : ''); }, [open, r]);
-  const ok = reason.trim().length >= 10;
-  return (
-    <Modal open={open} onClose={onClose}>
-      <div className="p-space-md border-b border-border-subtle flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-lg bg-primary-fixed flex items-center justify-center text-primary-container"><Icon name="verified_user" size={22} /></div>
-          <div><h3 className="text-headline-md">Phê duyệt: {r.kindLabel}</h3><p className="text-caption text-text-secondary">Mã hồ sơ: <span className="font-mono font-medium text-text-primary">{r.id}</span> • {r.name}</p></div>
-        </div>
-        <button className="p-1 rounded-lg hover:bg-surface-container text-text-secondary" onClick={onClose}><Icon name="close" size={20} /></button>
-      </div>
-      <div className="p-space-md flex flex-col gap-space-md overflow-y-auto">
-        <div className="p-3.5 rounded-lg bg-surface-bright flex gap-3 text-body-sm">
-          <Icon name="info" size={20} className="text-primary-container mt-0.5" />
-          <div>Xác nhận cho phép <b>{r.name} ({r.subjectId})</b> thực hiện thao tác “{r.kindLabel}”.<span className="text-text-secondary block mt-1">Lệnh phê duyệt sẽ được ghi vào Sổ cái kiểm toán (Immutable Audit Log).</span></div>
-        </div>
-        {r.twoPerson && <div className="p-3 rounded-lg bg-status-rejected/10 text-status-rejected text-body-sm flex gap-2"><Icon name="group" />Thao tác thu hồi yêu cầu 2 cán bộ độc lập xác nhận. {r.firstApproval ? `Xác nhận thứ nhất: ${r.firstApproval}.` : 'Bạn là người xác nhận thứ nhất.'}</div>}
-        <div className="grid grid-cols-2 gap-space-sm bg-surface-container-low p-3.5 rounded-lg text-body-sm">
-          <Field label="Trạm Kiosk áp dụng" value={<span className="font-medium flex items-center gap-1.5"><Icon name="point_of_sale" size={16} className="text-ai-border" />Kiosk 01, 02, 03</span>} />
-          <Field label="Thời hạn hiệu lực" value={<span className="font-medium flex items-center gap-1.5"><Icon name="timelapse" size={16} className="text-status-pending" />48 giờ</span>} />
-          <Field label="Số lần chụp tối đa" value={<span className="font-medium">01 lần (one-time slot)</span>} />
-          <Field label="Thuật toán đối soát bắt buộc" value={<span className="font-mono text-[12px] font-medium">Liveness v3.2 + ICAO-9303</span>} />
-        </div>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-label-md font-semibold flex justify-between"><span>Lý do phê duyệt / Ghi chú kiểm toán <span className="text-status-rejected">*</span></span><span className="text-caption text-text-secondary font-normal">Bắt buộc theo ISO 27701</span></span>
-          <textarea className="input leading-relaxed" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Nhập căn cứ phê duyệt..." />
-        </label>
-        <label className="flex gap-2.5 text-body-sm cursor-pointer"><input type="checkbox" checked={sms} onChange={(e) => setSms(e.target.checked)} className="mt-1 w-4 h-4 accent-primary-container" />Gửi SMS & thông báo đẩy qua App <b>MyDaiNam</b> kèm mã QR mở Kiosk.</label>
-        <label className="flex gap-2.5 text-body-sm text-text-secondary cursor-pointer"><input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} className="mt-1 w-4 h-4 accent-primary-container" />Lưu ảnh cũ vào kho đối soát lịch sử (Snapshot Retention 90 ngày).</label>
-      </div>
-      <div className="p-space-md bg-surface-bright border-t border-border-subtle flex items-center justify-between">
-        <span className="flex items-center gap-1.5 text-caption text-text-secondary"><Icon name="lock" size={16} className="text-ai-border" />Ký số định danh: <b>{CURRENT_USER.name} (PĐT)</b></span>
-        <div className="flex gap-2">
-          <button className="btn-outline" onClick={onClose}>Hủy bỏ</button>
-          <button className="btn bg-primary-container text-white hover:bg-primary px-5 font-semibold disabled:opacity-40" disabled={!ok} onClick={() => onConfirm(reason.trim())}><Icon name="check" />Xác nhận phê duyệt</button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-function ConsentDetail({ r, onDone }) {
-  const done = r.status !== 'pending';
-  const steps = [
-    ['Khóa hồ sơ Face ID tại toàn bộ Kiosk & Edge Box', 'Vô hiệu hóa quyền quét tại cổng A, B, C và KTX', 'done'],
-    ['Xóa ảnh chân dung gốc', 'Purge tệp ảnh khỏi server đệm và Blob Storage', 'done'],
-    ['Xóa template sinh trắc (vector 512d)', 'Ghi đè embedding trong pgvector + đồng bộ xóa tập 1:K trên Edge', done ? 'done' : 'running'],
-    ['Gửi biên bản xác nhận tới sinh viên', 'Email biên bản số xác nhận xóa dữ liệu vĩnh viễn', done ? 'done' : 'wait'],
-  ];
-  return (
-    <>
-      <div className="p-space-md border-b border-border-subtle flex flex-col gap-space-sm">
-        <div className="flex items-center gap-2"><span className="text-headline-md font-bold">{r.id}</span><Chip color="secondary" className="text-label-sm">Rút đồng ý xử lý dữ liệu sinh trắc</Chip>{done && <Chip color="status-active">Hoàn tất</Chip>}</div>
-        <div className="flex flex-wrap gap-x-4 text-caption text-text-secondary">
-          <span className="flex items-center gap-1"><Icon name="gavel" size={16} />Căn cứ: <b>Nghị định 13/2023/NĐ-CP</b></span>
-          <span className="flex items-center gap-1"><Icon name="schedule" size={16} />Gửi lúc: {r.created}</span>
-          <span className="flex items-center gap-1 text-status-pending font-medium"><Icon name="timer" size={16} />Thực thi trong <b>72 giờ</b></span>
-        </div>
-      </div>
-      <div className="p-space-md flex flex-col gap-space-md max-h-[calc(100vh-330px)] overflow-y-auto">
-        <div className="bg-surface-bright p-space-md rounded-lg grid grid-cols-2 gap-x-4 gap-y-3 text-body-sm">
-          <Field label="Chủ thể dữ liệu" value={<b className="text-body-md">{r.name}</b>} />
-          <Field label="Mã số sinh viên" value={<b className="font-mono text-primary-container">{r.subjectId}</b>} />
-          <Field label="Khoa" value={r.unit} />
-          <Field label="Xác thực chữ ký số OTP" value={<span className="font-mono text-caption font-semibold text-status-active">#OTP-9942 (Đã ký)</span>} />
-          <div className="col-span-2 pt-2 border-t border-border-subtle"><span className="text-caption text-text-secondary block mb-1">Lý do rút chấp thuận:</span><div className="p-2.5 rounded bg-surface leading-relaxed border-l-2 border-l-secondary">“{r.note}”</div></div>
-        </div>
-        <section className="flex flex-col gap-3">
-          <div className="flex justify-between"><h2 className="section-title">Tiến trình 4 bước tự động</h2><Chip color="ai">Quy chuẩn xóa dữ liệu ISO/IEC 27701</Chip></div>
-          <div className="relative pl-7 space-y-3 before:content-[''] before:absolute before:left-[9px] before:top-2 before:bottom-2 before:w-0.5 before:bg-border-subtle">
-            {steps.map(([t, d, s], i) => (
-              <div key={t} className={`relative ${s === 'wait' ? 'opacity-70' : ''}`}>
-                <span className={`absolute -left-7 mt-0.5 w-5 h-5 rounded-full flex items-center justify-center ring-4 ring-surface ${s === 'done' ? 'bg-status-active text-white' : s === 'running' ? 'bg-primary-container text-white animate-pulse' : 'bg-surface-container-high text-text-secondary'}`}><Icon name={s === 'done' ? 'check' : s === 'running' ? 'autorenew' : 'schedule'} size={13} /></span>
-                <div className={`p-3 rounded-lg flex items-center justify-between gap-2 ${s === 'running' ? 'bg-surface ring-1 ring-primary-container' : 'bg-surface-bright'}`}>
-                  <div><div className={`text-label-md font-semibold ${s === 'running' ? 'text-primary-container' : ''}`}>{i + 1}. {t}</div><div className="text-caption text-text-secondary">{d}</div></div>
-                  {s === 'done' ? <Chip color="status-active">Đã hoàn thành</Chip> : s === 'running' ? <Chip color="primary">Đang xử lý (80%)</Chip> : <Chip color="neutral">Chờ bước 3</Chip>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-        <section className="p-space-md rounded-lg border border-border-subtle">
-          <div className="flex items-center gap-2 mb-1"><Icon name="credit_card" size={22} className="text-secondary" /><h3 className="text-label-md font-bold">Phương án thay thế (phi sinh trắc)</h3></div>
-          <p className="text-body-sm text-text-secondary">Bảo đảm đầy đủ quyền lợi học tập cho sinh viên theo luật định:</p>
-          <div className="grid grid-cols-2 gap-space-sm mt-2">
-            <div className="p-3 rounded-lg bg-surface-bright border border-border-subtle flex gap-2.5"><Icon name="contactless" className="text-primary-container" /><div><b className="text-label-sm block">Thẻ sinh viên RFID + PIN</b><span className="text-caption text-text-secondary">Chip Mifare DESFire, kiểm soát truy cập tại cổng.</span></div></div>
-            <div className="p-3 rounded-lg bg-surface-bright border border-border-subtle flex gap-2.5"><Icon name="how_to_reg" className="text-status-active" /><div><b className="text-label-sm block">Điểm danh thủ công / BLE</b><span className="text-caption text-text-secondary">Giám thị đối soát thẻ + CCCD, không dùng camera khuôn mặt.</span></div></div>
-          </div>
-        </section>
-      </div>
-      <div className="p-space-md border-t border-border-subtle flex items-center justify-between mt-auto">
-        <span className="flex items-center gap-1.5 text-caption text-text-secondary"><Icon name="gavel" size={16} className="text-secondary" />Quyền rút đồng ý không thể bị từ chối — không có nút từ chối.</span>
-        <button className="btn bg-secondary text-white hover:opacity-90 px-6 py-2.5 font-semibold disabled:opacity-40" disabled={done} onClick={onDone}><Icon name="verified" />{done ? 'Đã xử lý' : 'Xác nhận đã xử lý'}</button>
-      </div>
+      <ConfirmReason open={ask === 'approve'} onClose={() => setAsk(null)} onConfirm={(x) => run('approve', x)} title={approveLabel} subtitle={`${r.request_id} • ${s.name}`} confirmLabel={approveLabel}
+        reasonLabel="Ghi chú phê duyệt" placeholder="Căn cứ phê duyệt, ví dụ: đã đối chiếu CCCD, GVCN đã xác nhận…">
+        <Banner icon="info">{lastStep && !(r.two_person && !r.first_confirm) ? `Khi xác nhận: ${outcome}` : `Yêu cầu chuyển tiếp: ${r.two_person && lastStep ? 'chờ cán bộ thứ 2 xác nhận' : r.approvals[stepIdx + 1]?.label}.`}</Banner>
+      </ConfirmReason>
+      <ConfirmReason open={ask === 'reject'} onClose={() => setAsk(null)} onConfirm={(x) => run('reject', x)} danger title="Từ chối yêu cầu" subtitle={`${r.request_id} • ${s.name}`} confirmLabel="Từ chối và gửi lý do"
+        reasonLabel="Lý do từ chối (gửi về App cho người gửi)" placeholder="Giải thích cụ thể vì sao từ chối và người gửi cần làm gì tiếp theo.">
+        <Banner tone="warn">Lý do được lưu công khai trong nhật ký và gửi về App MyDaiNam. Không được từ chối mà không giải trình.</Banner>
+      </ConfirmReason>
+      <ConfirmReason open={ask === 'reveal'} onClose={() => setAsk(null)} onConfirm={(x) => run('reveal', x)} title="Xem ảnh gốc" subtitle={`${s.name} • ${s.code}`} minLength={5}>
+        <Banner tone="warn">Ảnh mở qua link có thời hạn 60 giây. Lượt xem ghi bất biến với mã VIEW_ORIGINAL_IMAGE.</Banner>
+      </ConfirmReason>
     </>
   );
 }

@@ -1,101 +1,171 @@
 import { useState } from 'react';
-import { Icon, Chip, PageHeader, Modal } from '../components/ui';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Banner, Chip, ConfirmReason, DataBoundary, Icon, PageHeader, SourceBadge, SubjectTypeChip, Tabs } from '../components/ui';
 import { useApp } from '../store';
-import { RULES } from '../data/mock';
+import { TRIGGER_SHORT, TRIGGER_TARGET } from '../api/enums';
+import { rollbackPolicy } from '../api/client';
+import { diffConfig } from '../api/policyValidation';
+import { fmtDateTime } from '../lib/format';
+import { fieldLabel, timeWindowText, valueText } from '../lib/policyText';
+import { unitName } from '../lib/scope';
+import EventRules from './EventRules';
 
-const GROUPS = ['Sinh viên lớp học phần', 'Giảng viên phụ trách môn', 'Danh sách Blacklist', 'Không có quyền', 'Cán bộ hành chính', 'Khách tham quan'];
-const SPACES = ['Phòng học (Tòa C)', 'Phòng Server A501', 'Cổng & Sảnh (Public)', 'KTX Tòa B', 'Phòng LAB 402'];
-const TIMES = ['Theo TKB — ±15 phút', '24/7', 'Giờ hành chính (07:30–17:00)', '06:00–21:00'];
-const ACTIONS = ['Ghi PRESENT / LATE', 'Còi tại chỗ + Push SOC (≤2s)', 'Ghi Immutable Audit Log', 'ISAPI Start/Stop NVR', 'Cho phép mở cửa'];
+const current = (p) => p.versions.find((v) => v.version === p.current_version);
 
 export default function Policies() {
-  const { log, toast } = useApp();
-  const [rules, setRules] = useState(RULES);
-  const [editor, setEditor] = useState(false);
-  const [form, setForm] = useState({ name: '', group: GROUPS[0], space: SPACES[0], time: TIMES[0], action: ACTIONS[0] });
-  const [dry, setDry] = useState(null);
-
-  const runDry = () => {
-    const rt = form.action.includes('SOC');
-    setDry({ events: rt ? 4 : 1840, matched: rt ? 2 : 1712, conflicts: form.space.includes('Server') && form.action.includes('mở cửa') ? 1 : 0, rt });
-  };
-  const save = (live) => {
-    const r = { id: `R-${String(rules.length + 1).padStart(3, '0')}`, ...form, name: form.name || 'Rule mới', type: form.action.includes('SOC') ? 'realtime' : 'audit', enabled: live, hits: 0 };
-    setRules((rs) => [...rs, r]);
-    log(`${live ? 'Áp dụng' : 'Lưu Dry-Run'} rule ${r.id}: ${r.name}`, r.id);
-    toast(live ? 'Đã áp dụng rule' : 'Đã lưu ở chế độ Dry-Run', `${r.id} • ${r.name}`, 'success');
-    setEditor(false); setDry(null); setForm({ name: '', group: GROUPS[0], space: SPACES[0], time: TIMES[0], action: ACTIONS[0] });
-  };
-
+  const [params, setParams] = useSearchParams();
+  const tab = params.get('tab') || 'biometric';
   return (
     <div>
-      <PageHeader icon="policy" title="Rule & Chính sách" desc="Middleware Policy Engine (PDP) • Đối tượng + Không gian + Thời gian → Hành động. Giao diện hóa 100%, không cấu hình cứng trong code."
-        actions={<button className="btn-primary" onClick={() => setEditor(true)}><Icon name="add" />Tạo rule</button>} />
-
-      <div className="grid grid-cols-2 gap-space-md mb-space-md">
-        <div className="card p-space-md border-l-4 border-l-status-rejected"><div className="flex items-center gap-2 text-label-md font-semibold"><Icon name="bolt" className="text-status-rejected" />Real-time Triggers (≤ 2 giây)</div><p className="text-caption text-text-secondary mt-1">Blacklist tại cổng/sảnh; người lạ/không có quyền tại Restricted Zone → còi tại chỗ + push SOC.</p></div>
-        <div className="card p-space-md border-l-4 border-l-primary-container"><div className="flex items-center gap-2 text-label-md font-semibold"><Icon name="menu_book" className="text-primary-container" />Read-only / Audit Logs</div><p className="text-caption text-text-secondary mt-1">Điểm danh PRESENT/LATE, nhật ký ra vào phòng làm việc, heatmap mật độ — phục vụ thống kê & thanh tra.</p></div>
-      </div>
-
-      <div className="card overflow-hidden">
-        <table className="w-full text-left text-body-sm">
-          <thead className="bg-surface-bright"><tr className="h-10 text-[12px] uppercase tracking-wider text-text-secondary">
-            {['ID', 'Tên rule', 'Đối tượng', 'Không gian', 'Thời gian', 'Hành động', 'Loại', 'Lượt khớp (30 ngày)', 'Bật'].map((h) => <th key={h} className="px-3 font-medium">{h}</th>)}
-          </tr></thead>
-          <tbody>
-            {rules.map((r) => (
-              <tr key={r.id} className="h-12 border-t border-border-subtle/60 hover:bg-surface-container-low">
-                <td className="px-3 font-mono text-caption whitespace-nowrap">{r.id}</td>
-                <td className="px-3 font-medium">{r.name}</td>
-                <td className="px-3">{r.group}</td>
-                <td className="px-3">{r.space}</td>
-                <td className="px-3 whitespace-nowrap">{r.time}</td>
-                <td className="px-3 text-caption">{r.action}</td>
-                <td className="px-3">{r.type === 'realtime' ? <Chip color="status-rejected" icon="bolt">Real-time</Chip> : <Chip color="primary">Audit</Chip>}</td>
-                <td className="px-3 tabular-nums">{r.hits.toLocaleString('vi-VN')}</td>
-                <td className="px-3">
-                  <button role="switch" aria-checked={r.enabled} onClick={() => { setRules((rs) => rs.map((x) => (x.id === r.id ? { ...x, enabled: !x.enabled } : x))); log(`${r.enabled ? 'Tắt' : 'Bật'} rule ${r.id}`, r.id); }}
-                    className={`w-10 h-5 rounded-full relative transition-colors ${r.enabled ? 'bg-status-active' : 'bg-border-strong'}`}>
-                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${r.enabled ? 'left-[22px]' : 'left-0.5'}`} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <Modal open={editor} onClose={() => { setEditor(false); setDry(null); }} width="max-w-2xl">
-        <div className="p-space-md border-b border-border-subtle flex items-center justify-between"><h3 className="text-headline-md">Tạo rule mới</h3><button className="p-1 text-text-secondary" onClick={() => { setEditor(false); setDry(null); }}><Icon name="close" size={20} /></button></div>
-        <div className="p-space-md flex flex-col gap-space-md overflow-y-auto">
-          <label className="flex flex-col gap-1 text-label-md font-semibold">Tên rule<input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="VD: Ra vào Phòng LAB 402 ngoài giờ" /></label>
-          <div className="flex items-stretch gap-2">
-            {[['group', 'Nhóm đối tượng', GROUPS, 'groups'], ['space', 'Phòng / Zone', SPACES, 'meeting_room'], ['time', 'Khung thời gian', TIMES, 'schedule'], ['action', 'Hành động', ACTIONS, 'bolt']].map(([k, l, opts, ic], i) => (
-              <div key={k} className="flex items-center gap-2 flex-1">
-                <label className="flex-1 p-2.5 rounded-lg bg-surface-container-low flex flex-col gap-1">
-                  <span className="text-caption text-text-secondary flex items-center gap-1"><Icon name={ic} size={14} />{l}</span>
-                  <select className="bg-transparent text-body-sm font-medium outline-none" value={form[k]} onChange={(e) => { setForm({ ...form, [k]: e.target.value }); setDry(null); }}>{opts.map((o) => <option key={o}>{o}</option>)}</select>
-                </label>
-                {i < 3 && <Icon name="arrow_forward" className="text-status-inactive" />}
-              </div>
-            ))}
-          </div>
-          <div className="p-3 rounded-lg border border-dashed border-border-strong">
-            <div className="flex items-center justify-between"><div className="text-label-md font-semibold flex items-center gap-1.5"><Icon name="science" className="text-ai-border" />Dry-Run (chạy thử ngầm trên 24h dữ liệu)</div><button className="btn-ghost" onClick={runDry}><Icon name="play_arrow" />Chạy thử</button></div>
-            {dry && (
-              <div className="grid grid-cols-3 gap-2 mt-3 anim-fade">
-                <div className="p-2 rounded bg-surface-bright"><div className="text-caption text-text-secondary">Sự kiện đầu vào</div><div className="font-semibold tabular-nums">{dry.events.toLocaleString('vi-VN')}</div></div>
-                <div className="p-2 rounded bg-surface-bright"><div className="text-caption text-text-secondary">Sẽ kích hoạt</div><div className="font-semibold tabular-nums">{dry.matched.toLocaleString('vi-VN')}</div></div>
-                <div className={`p-2 rounded ${dry.conflicts ? 'bg-status-rejected/10' : 'bg-surface-bright'}`}><div className="text-caption text-text-secondary">Xung đột rule</div><div className={`font-semibold ${dry.conflicts ? 'text-status-rejected' : 'text-status-active'}`}>{dry.conflicts ? `${dry.conflicts} — xung đột R-004` : 'Không có'}</div></div>
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="p-space-md bg-surface-bright border-t border-border-subtle flex justify-end gap-2">
-          <button className="btn-outline" onClick={() => save(false)}>Lưu ở chế độ Dry-Run</button>
-          <button className="btn-primary disabled:opacity-40" disabled={!dry || dry.conflicts > 0} title={!dry ? 'Cần chạy Dry-Run trước' : ''} onClick={() => save(true)}><Icon name="check" />Áp dụng thật</button>
-        </div>
-      </Modal>
+      <PageHeader title="Chính sách & quy tắc" desc="Mọi tham số vận hành lấy từ đây; không cấu hình trong mã nguồn hay tệp .env. Mỗi lần lưu tạo một phiên bản mới." />
+      <Tabs label="Loại cấu hình" className="mb-space-md border-b border-border-subtle" value={tab} onChange={(t) => setParams(t === 'biometric' ? {} : { tab: t })}
+        items={[{ key: 'biometric', label: 'Chính sách sinh trắc' }, { key: 'rules', label: 'Quy tắc sự kiện' }]} />
+      {tab === 'biometric' ? <BiometricPolicies /> : <EventRules />}
     </div>
+  );
+}
+
+function BiometricPolicies() {
+  const { data, can } = useApp();
+  const [sel, setSel] = useState(data.policies[0].policy_id);
+  const policy = data.policies.find((p) => p.policy_id === sel);
+  return (
+    <DataBoundary name="policies" label="danh sách chính sách" skeleton="split">
+      {!can('policy_write') && <Banner className="mb-space-md" icon="lock" title="Chỉ xem.">Chỉ vai trò Quản trị hệ thống được sửa chính sách. Đổi vai trò ở góc trên bên phải để thử.</Banner>}
+      <div className="grid grid-cols-[340px_minmax(0,1fr)] gap-space-md items-start">
+        <nav aria-label="Danh sách chính sách" className="card overflow-hidden divide-y divide-border-subtle">
+          {data.policies.map((p) => {
+            const c = current(p).config;
+            const on = p.policy_id === sel;
+            return (
+              <button key={p.policy_id} onClick={() => setSel(p.policy_id)} aria-current={on ? 'true' : undefined}
+                className={`w-full text-left px-3.5 py-3 flex flex-col gap-1.5 -outline-offset-2 ${on ? 'bg-primary-fixed shadow-[inset_3px_0_0_theme(colors.primary-container)]' : 'hover:bg-surface-container-low'}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-label-md font-semibold">{p.name}</span>
+                  <span className="font-mono text-caption text-text-secondary">{p.current_version}</span>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <SubjectTypeChip type={p.target_subject_type} />
+                  <span className="text-caption text-text-secondary">{c.biometric.pose_count} tư thế</span>
+                  <span className="text-caption text-text-secondary">• {c.biometric.ai_auto_approve_enabled ? `AI tự duyệt từ ${c.biometric.ai_auto_approve_threshold}%` : 'Duyệt tay'}</span>
+                </div>
+              </button>
+            );
+          })}
+        </nav>
+        <PolicyDetail policy={policy} />
+      </div>
+    </DataBoundary>
+  );
+}
+
+const Row = ({ label, children }) => (
+  <div className="grid grid-cols-[200px_minmax(0,1fr)] gap-3 py-2 border-b border-border-subtle last:border-0">
+    <dt className="text-text-secondary">{label}</dt><dd className="min-w-0">{children}</dd>
+  </div>
+);
+
+function PolicyDetail({ policy }) {
+  const { can, call, toast } = useApp();
+  const [rollback, setRollback] = useState(null);
+  const [openVer, setOpenVer] = useState(null);
+  const v = current(policy);
+  const c = v.config;
+  const b = c.biometric;
+  const versions = [...policy.versions].reverse();
+
+  return (
+    <section className="card overflow-hidden" aria-label={`Chính sách ${policy.name}`}>
+      <header className="px-space-md py-3 border-b border-border-subtle flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2"><h2 className="text-k-title-md">{policy.name}</h2><Chip color="status-active">Đang áp dụng {policy.current_version}</Chip></div>
+          <p className="text-caption text-text-secondary"><span className="font-mono">{policy.policy_id}</span> • Lưu bởi {v.saved_by} lúc {fmtDateTime(v.saved_at)}</p>
+        </div>
+        {can('policy_write')
+          ? <Link to={`/chinh-sach/${policy.policy_id}/sua`} className="btn-primary shrink-0"><Icon name="edit" />Chỉnh sửa</Link>
+          : <button className="btn-primary shrink-0" disabled title="Chỉ Quản trị hệ thống được sửa"><Icon name="edit" />Chỉnh sửa</button>}
+      </header>
+
+      <div className="p-space-md grid grid-cols-2 gap-x-space-lg">
+        <div>
+          <h3 className="section-title mb-1">Phạm vi, không gian, thời gian</h3>
+          <dl className="text-body-sm">
+            <Row label="Đối tượng">{c.scope.subject_types.map((t) => <SubjectTypeChip key={t} type={t} className="mr-1" />)}</Row>
+            <Row label="Đơn vị">{c.scope.org_units.map(unitName).join(', ')}</Row>
+            <Row label="Khu vực kiểm soát"><span className="font-mono">{c.spatial.zones.join(', ')}</span></Row>
+            <Row label="Khung thời gian">{timeWindowText(c.spatial.time_window)}</Row>
+          </dl>
+        </div>
+        <div>
+          <h3 className="section-title mb-1">Thông số sinh trắc</h3>
+          <dl className="text-body-sm">
+            <Row label="Nguồn chấp nhận"><div className="flex flex-wrap gap-1">{b.accepted_sources.map((s) => <SourceBadge key={s} source={s} />)}</div></Row>
+            <Row label="Số tư thế">{b.pose_count}</Row>
+            <Row label="Chất lượng ảnh tối thiểu">{b.min_quality}/100</Row>
+            <Row label="AI tự duyệt">{b.ai_auto_approve_enabled ? <>Bật, từ <b>{b.ai_auto_approve_threshold}%</b></> : 'Tắt, mọi hồ sơ do người duyệt'}</Row>
+            <Row label="Chụp lại">{b.rescan_validity_hours} giờ, {b.rescan_max_uses} lần, qua {valueText('biometric.rescan_channels', b.rescan_channels)}</Row>
+          </dl>
+        </div>
+        <div className="col-span-2 mt-space-md">
+          <h3 className="section-title mb-2">Luồng phê duyệt và sự kiện gửi ra ngoài</h3>
+          <div className="flex items-center gap-2 flex-wrap text-body-sm mb-3">
+            <span className="px-2.5 py-1.5 rounded bg-surface-container-low">Người gửi yêu cầu</span>
+            {c.workflow.approval_chain.map((s) => (<span key={s.id} className="flex items-center gap-2"><Icon name="arrow_forward" size={16} className="text-text-secondary" /><span className="px-2.5 py-1.5 rounded border border-primary-container/40 bg-primary-fixed text-primary-container font-medium">{s.label}</span></span>))}
+            <Icon name="arrow_forward" size={16} className="text-text-secondary" /><span className="px-2.5 py-1.5 rounded bg-status-active/10 text-status-active">Hoàn tất</span>
+            {c.workflow.revoke_two_person && <Chip color="status-pending" icon="group" className="ml-2">Thu hồi cần 2 người</Chip>}
+            <span className="text-caption text-text-secondary ml-2">Xóa dữ liệu trong {c.workflow.retention_days_after_withdraw} ngày sau khi rút đồng ý</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {c.triggers.map((t) => (
+              <span key={t.id} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border text-caption ${t.enabled ? 'border-border-strong' : 'border-border-subtle text-text-secondary line-through'}`}>
+                <Icon name={TRIGGER_TARGET[t.target].icon} size={14} />{TRIGGER_SHORT[t.id]}<span className="font-mono text-text-secondary">{t.transport === 'KAFKA' ? 'Kafka' : 'Webhook'}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-border-subtle">
+        <h3 className="section-title px-space-md pt-3 pb-2">Lịch sử phiên bản</h3>
+        <ol className="divide-y divide-border-subtle">
+          {versions.map((ver, i) => {
+            const prev = policy.versions[policy.versions.length - 2 - i];
+            const changes = prev ? diffConfig(prev.config, ver.config) : [];
+            const isCur = ver.version === policy.current_version;
+            const open = openVer === ver.version;
+            return (
+              <li key={ver.version} className="px-space-md py-2.5">
+                <div className="flex items-start gap-3">
+                  <span className={`font-mono text-label-md w-12 shrink-0 ${isCur ? 'text-primary-container font-semibold' : 'text-text-secondary'}`}>{ver.version}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-body-sm">{ver.reason}</p>
+                    <p className="text-caption text-text-secondary">{ver.saved_by} • {fmtDateTime(ver.saved_at)}{prev && <> • {changes.length} thay đổi so với {prev.version}</>}</p>
+                    {open && changes.length > 0 && (
+                      <table className="mt-2 w-full text-caption border border-border-subtle rounded">
+                        <thead><tr className="bg-surface-container-low text-text-secondary"><th className="text-left px-2 py-1 font-medium">Trường</th><th className="text-left px-2 py-1 font-medium">Trước ({prev.version})</th><th className="text-left px-2 py-1 font-medium">Sau ({ver.version})</th></tr></thead>
+                        <tbody>{changes.map((d) => <tr key={d.path} className="border-t border-border-subtle align-top"><td className="px-2 py-1">{fieldLabel(d.path)}</td><td className="px-2 py-1 text-status-rejected">{valueText(d.path, d.from)}</td><td className="px-2 py-1 text-status-active">{valueText(d.path, d.to)}</td></tr>)}</tbody>
+                      </table>
+                    )}
+                  </div>
+                  <div className="flex gap-1.5 shrink-0">
+                    {isCur && <Chip color="status-active">Hiện hành</Chip>}
+                    {prev && <button className="btn-outline btn-sm" aria-expanded={open} onClick={() => setOpenVer(open ? null : ver.version)}>{open ? 'Ẩn thay đổi' : 'Xem thay đổi'}</button>}
+                    {!isCur && can('policy_write') && <button className="btn-outline btn-sm" onClick={() => setRollback(ver.version)}><Icon name="history" size={16} />Khôi phục</button>}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+
+      <ConfirmReason open={!!rollback} onClose={() => setRollback(null)} title={`Khôi phục cấu hình ${rollback}`} subtitle={`${policy.policy_id} • ${policy.name}`} confirmLabel="Khôi phục"
+        onConfirm={async (reason) => {
+          try { const r = await call(rollbackPolicy, policy.policy_id, rollback, reason); toast('Đã khôi phục', `Tạo phiên bản ${r.version} mang cấu hình ${rollback}. Phiên bản cũ vẫn được giữ.`, 'success'); } catch (e) { toast('Không khôi phục được', e.message, 'error'); }
+          setRollback(null);
+        }}>
+        <Banner>Khôi phục không ghi đè lịch sử: hệ thống tạo phiên bản mới mang cấu hình của {rollback}.</Banner>
+      </ConfirmReason>
+    </section>
   );
 }
