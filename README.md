@@ -29,7 +29,7 @@ Build: `npm run build` (thư mục `dist/`), hoặc `npm run build:single` để
 - Ảnh khuôn mặt luôn làm mờ, "Xem rõ" yêu cầu lý do và ghi log; không dùng ảnh thật (hình minh họa SVG).
 - AI chỉ gợi ý ("Gợi ý của AI – người duyệt quyết định"); không có nút AI tự từ chối / thu hồi.
 - Không có xuất ảnh hàng loạt; thao tác nhạy cảm có modal lý do bắt buộc.
-- Phạm vi (tenant, đơn vị, đối tượng) luôn hiển thị trên thanh trên cùng.
+- Phạm vi (tenant, đơn vị, đối tượng), tra cứu và chuông thông báo chỉ hiển thị trên thanh trên cùng của trang Tổng quan.
 
 ## Hệ thống giao diện
 - Màu: xanh `#01358F` là màu chủ đạo; cam `#F57301` chỉ làm điểm nhấn, không dùng làm chữ trên nền sáng và không đặt chữ trắng lên trên (2.86:1, không đạt WCAG AA). Khi cần chữ màu cam dùng `accent-strong` `#B85200`.
@@ -39,7 +39,7 @@ Build: `npm run build` (thư mục `dist/`), hoặc `npm run build:single` để
 - Điều khiển: `btn-sm` 32px, `btn` và ô nhập 40px, `btn-lg` 48px; Kiosk 56px. Bo góc 4px cho điều khiển, 8px cho khối.
 - Component dùng chung ở `src/components/ui.jsx`: `Select`, `Tabs`, `Banner`, `MetricStrip`, `SearchInput`, `PageHeader`, `Modal`, `Drawer`, `ConfirmReason`, `DataBoundary`, `SortTh`. Bảng dùng class `.data-table` và hook `useSort`.
 - Thuật ngữ và định dạng số, ngày: xem [docs/glossary.md](docs/glossary.md).
-- Phạm vi: dùng `useScope` (`src/lib/scope.js`) để lọc theo đơn vị và đối tượng. Trang hạ tầng (thiết bị, không gian, quy tắc, an ninh, AI, nhật ký) áp dụng toàn trường và có ghi chú khi đang chọn đơn vị.
+- Phạm vi: dùng `useScope` (`src/lib/scope.js`) để lọc theo đơn vị và đối tượng. Phạm vi chỉ có hiệu lực ở trang Tổng quan; các trang khác luôn hiển thị toàn bộ dữ liệu.
 
 ## Trạng thái dữ liệu
 `DataBoundary` hiển thị trạng thái đang tải, lỗi kèm "Thử lại" và phạm vi chưa có dữ liệu. Khi có backend, chỉ cần thay `loadResource` trong `src/lib/resource.js` bằng lời gọi API.

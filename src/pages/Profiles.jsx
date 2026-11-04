@@ -162,7 +162,7 @@ export default function Profiles() {
           </table>
           {rows.length === 0 && (
             <div className="flex flex-col items-center">
-              <Empty icon="search_off" title="Không có hồ sơ phù hợp" desc="Thử bỏ bớt bộ lọc hoặc đổi phạm vi ở thanh trên cùng." />
+              <Empty icon="search_off" title="Không có hồ sơ phù hợp" desc="Thử bỏ bớt bộ lọc." />
               {canReset && <button className="btn-outline -mt-6 mb-8" onClick={reset}>Đặt lại bộ lọc</button>}
             </div>
           )}

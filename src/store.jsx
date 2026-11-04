@@ -7,8 +7,14 @@ const now = () => {
   return `${d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })} ${d.toLocaleTimeString('vi-VN', { hour12: false })}`;
 };
 
+const RAIL_KEY = 'sacip.railCollapsed';
+const readRail = () => {
+  try { return localStorage.getItem(RAIL_KEY) === '1'; } catch { return false; }
+};
+
 export function AppProvider({ children }) {
   const [scope, setScope] = useState({ tenant: TENANTS[0], unit: ORG_UNITS[0], subject: SUBJECT_TYPES[0] });
+  const [railCollapsed, setRailCollapsed] = useState(readRail);
   const [audit, setAudit] = useState(INITIAL_AUDIT);
   const [toasts, setToasts] = useState([]);
   const [profiles, setProfiles] = useState(PROFILES);
@@ -25,10 +31,17 @@ export function AppProvider({ children }) {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3800);
   }, []);
 
+  const toggleRail = useCallback(() => {
+    setRailCollapsed((c) => {
+      try { localStorage.setItem(RAIL_KEY, c ? '0' : '1'); } catch { /* Không lưu được thì chỉ giữ trong phiên này. */ }
+      return !c;
+    });
+  }, []);
+
   const value = useMemo(() => ({
-    scope, setScope, audit, log, toasts, toast,
+    scope, setScope, audit, log, toasts, toast, railCollapsed, toggleRail,
     profiles, setProfiles, requests, setRequests, notifications, setNotifications,
-  }), [scope, audit, log, toasts, toast, profiles, requests, notifications]);
+  }), [scope, audit, log, toasts, toast, railCollapsed, toggleRail, profiles, requests, notifications]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

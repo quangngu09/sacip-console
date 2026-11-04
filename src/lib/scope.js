@@ -1,3 +1,4 @@
+import { useLocation } from 'react-router-dom';
 import { useApp } from '../store';
 import { ORG_UNITS, SUBJECT_TYPES, TENANTS } from '../data/mock';
 
@@ -11,8 +12,13 @@ const UNIT_PATTERN = {
 };
 const SUBJECT_BY_PREFIX = { SV: 'Sinh viên', GV: 'Giảng viên', NV: 'Cán bộ', EXT: 'NV thuê ngoài', KTX: 'Cư dân KTX' };
 
+const ALL_SCOPE = { tenant: TENANTS[0], unit: ORG_UNITS[0], subject: SUBJECT_TYPES[0] };
+
+// Thanh chọn phạm vi chỉ có ở Tổng quan, nên các trang khác luôn hiển thị toàn bộ dữ liệu.
 export function useScope() {
-  const { scope } = useApp();
+  const { scope: selected } = useApp();
+  const { pathname } = useLocation();
+  const scope = pathname === '/' ? selected : ALL_SCOPE;
   const allUnits = scope.unit === ORG_UNITS[0];
   const allSubjects = scope.subject === SUBJECT_TYPES[0];
   return {

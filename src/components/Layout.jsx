@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Icon, Select } from './ui';
 import { useApp } from '../store';
-import { useScope } from '../lib/scope';
 import { CURRENT_USER, TENANTS, ORG_UNITS, SUBJECT_TYPES } from '../data/mock';
 import logo from '../assets/logo-dnu.svg';
+import logoMark from '../assets/logo-dnu-mark.svg';
 
 const NAV = [
   { group: 'Vận hành', items: [
@@ -27,41 +27,61 @@ const NAV = [
 ];
 
 function Sidebar() {
-  const { requests } = useApp();
-  const { primaryTenant, matchUnit, matchSubject } = useScope();
-  const pending = primaryTenant ? requests.filter((r) => r.status === 'pending' && matchUnit(r.unit) && matchSubject(r.subjectId)).length : 0;
+  const { requests, railCollapsed: collapsed, toggleRail } = useApp();
+  const pending = requests.filter((r) => r.status === 'pending').length;
+  const shape = `relative flex items-center h-9 rounded text-label-md transition-colors focus-visible:outline-white ${collapsed ? 'justify-center' : 'gap-2.5 px-2.5'}`;
+  const toggleLabel = collapsed ? 'Mở rộng menu' : 'Thu gọn menu';
   return (
-    <aside className="fixed left-0 top-0 h-full w-[240px] bg-rail z-40 flex flex-col">
-      <div className="h-14 px-3 bg-surface flex items-center gap-2.5 border-b border-border-subtle">
-        <img src={logo} alt="Trường Đại học Đại Nam" className="h-8 w-auto" />
-        <span className="w-px h-7 bg-border-strong" />
-        <div className="text-label-sm font-semibold leading-tight text-primary-container">SACIP<br /><span className="font-normal text-text-secondary">Console</span></div>
-      </div>
-      <nav className="flex-1 px-space-sm overflow-y-auto py-2">
-        {NAV.map((g) => (
+    <aside className={`fixed left-0 top-0 h-full ${collapsed ? 'w-16' : 'w-[240px]'} bg-rail z-40 flex flex-col overflow-hidden transition-[width] duration-200`}>
+      {collapsed ? (
+        <div className="h-14 shrink-0 bg-surface flex items-center justify-center border-b border-border-subtle">
+          <img src={logoMark} alt="Trường Đại học Đại Nam" className="h-8 w-auto" />
+        </div>
+      ) : (
+        <div className="h-14 shrink-0 px-3 bg-surface flex items-center gap-2.5 border-b border-border-subtle">
+          <img src={logo} alt="Trường Đại học Đại Nam" className="h-8 w-auto" />
+          <span className="w-px h-7 bg-border-strong" />
+          <div className="text-label-sm font-semibold leading-tight text-primary-container">SACIP<br /><span className="font-normal text-text-secondary">Console</span></div>
+        </div>
+      )}
+      <nav className="flex-1 px-space-sm overflow-y-auto overflow-x-hidden py-2">
+        {NAV.map((g, i) => (
           <div key={g.group} className="mb-3">
-            <div className="px-2.5 pt-1 pb-1 text-caption text-rail-muted">{g.group}</div>
+            {collapsed && i > 0 && <div className="mx-1 mb-3 border-t border-rail-line" />}
+            <div className={collapsed ? 'sr-only' : 'px-2.5 pt-1 pb-1 text-caption text-rail-muted whitespace-nowrap'}>{g.group}</div>
             {g.items.map((it) => (
-              <NavLink key={it.to} to={it.to} end={it.end}
-                className={({ isActive }) => `flex items-center gap-2.5 h-9 px-2.5 rounded text-label-md transition-colors focus-visible:outline-white ${isActive ? 'bg-rail-active text-white shadow-[inset_3px_0_0_theme(colors.accent)]' : 'text-rail-text hover:bg-rail-hover hover:text-white'}`}>
+              <NavLink key={it.to} to={it.to} end={it.end} title={collapsed ? it.label : undefined}
+                className={({ isActive }) => `${shape} ${isActive ? 'bg-rail-active text-white shadow-[inset_3px_0_0_theme(colors.accent)]' : 'text-rail-text hover:bg-rail-hover hover:text-white'}`}>
                 <Icon name={it.icon} size={18} />
-                <span className="truncate">{it.label}</span>
-                {it.badge === 'requests' && pending > 0 && <span className="ml-auto min-w-[20px] h-5 px-1 rounded bg-accent text-on-accent text-caption font-semibold flex items-center justify-center" aria-label={`${pending} yêu cầu chờ duyệt`}>{pending}</span>}
-                {it.badge === 'soc' && <span className="ml-auto w-2 h-2 rounded-full bg-rail-alert" role="img" aria-label="Có sự kiện chưa xử lý" />}
+                <span className={collapsed ? 'sr-only' : 'truncate'}>{it.label}</span>
+                {it.badge === 'requests' && pending > 0 && <span className={`${collapsed ? 'absolute top-0 right-0.5 min-w-[16px] h-4 px-0.5' : 'ml-auto min-w-[20px] h-5 px-1'} rounded bg-accent text-on-accent text-caption font-semibold flex items-center justify-center`} aria-label={`${pending} yêu cầu chờ duyệt`}>{pending}</span>}
+                {it.badge === 'soc' && <span className={`${collapsed ? 'absolute top-1.5 right-2' : 'ml-auto'} w-2 h-2 rounded-full bg-rail-alert`} role="img" aria-label="Có sự kiện chưa xử lý" />}
               </NavLink>
             ))}
           </div>
         ))}
         <div className="border-t border-rail-line pt-2">
-          <NavLink to="/kiosk" className="flex items-center gap-2.5 h-9 px-2.5 rounded text-label-md text-rail-text hover:bg-rail-hover hover:text-white focus-visible:outline-white">
-            <Icon name="photo_camera_front" size={18} /><span>Mở Kiosk trạm chụp</span><Icon name="open_in_new" size={14} className="ml-auto" />
+          <NavLink to="/kiosk" title={collapsed ? 'Mở Kiosk trạm chụp' : undefined} className={`${shape} text-rail-text hover:bg-rail-hover hover:text-white`}>
+            <Icon name="photo_camera_front" size={18} /><span className={collapsed ? 'sr-only' : 'whitespace-nowrap'}>Mở Kiosk trạm chụp</span>{!collapsed && <Icon name="open_in_new" size={14} className="ml-auto" />}
           </NavLink>
         </div>
       </nav>
-      <div className="px-space-md py-2.5 border-t border-rail-line flex items-center justify-between text-caption text-rail-muted">
-        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-green-500" />Hệ thống trực tuyến</span>
-        <span className="font-mono">v2.4.8</span>
+      <div className="px-space-sm pt-2 border-t border-rail-line">
+        <button type="button" onClick={toggleRail} aria-expanded={!collapsed} title={collapsed ? toggleLabel : undefined} className={`${shape} w-full text-rail-text hover:bg-rail-hover hover:text-white`}>
+          <Icon name={collapsed ? 'left_panel_open' : 'left_panel_close'} size={18} />
+          <span className={collapsed ? 'sr-only' : 'whitespace-nowrap'}>{toggleLabel}</span>
+        </button>
       </div>
+      {collapsed ? (
+        <div className="h-9 flex items-center justify-center" title="Hệ thống trực tuyến • v2.4.8">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500" role="img" aria-label="Hệ thống trực tuyến" />
+        </div>
+      ) : (
+        <div className="px-space-md py-2 flex items-center justify-between text-caption text-rail-muted whitespace-nowrap">
+          <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-green-500" />Hệ thống trực tuyến</span>
+          <span className="font-mono">v2.4.8</span>
+        </div>
+      )}
     </aside>
   );
 }
@@ -105,7 +125,9 @@ function Notifications({ onClose }) {
 }
 
 function TopBar() {
-  const { scope, setScope, notifications, toast } = useApp();
+  const { scope, setScope, notifications, toast, railCollapsed } = useApp();
+  const { pathname } = useLocation();
+  const onDashboard = pathname === '/';
   const [open, setOpen] = useState(false);
   const ref = useRef();
   useEffect(() => {
@@ -115,30 +137,36 @@ function TopBar() {
   }, []);
   const unread = notifications.some((n) => n.unread);
   return (
-    <header className="fixed top-0 left-[240px] right-0 h-14 bg-surface z-30 border-b border-border-subtle flex items-center justify-between px-space-lg gap-3">
-      <div className="flex items-center gap-1.5 flex-1 min-w-0">
-        <Select variant="inline" label="Đơn vị chủ quản" value={scope.tenant} options={TENANTS} onChange={(v) => setScope((s) => ({ ...s, tenant: v }))} />
-        <span className="text-border-strong" aria-hidden>/</span>
-        <Select variant="inline" label="Khoa / Phòng ban" value={scope.unit} options={ORG_UNITS} onChange={(v) => setScope((s) => ({ ...s, unit: v }))} />
-        <span className="text-border-strong" aria-hidden>/</span>
-        <Select variant="inline" label="Đối tượng" value={scope.subject} options={SUBJECT_TYPES} onChange={(v) => setScope((s) => ({ ...s, subject: v }))} />
-        <form className="flex-1 min-w-[200px] max-w-sm ml-3" onSubmit={(e) => { e.preventDefault(); const q = new FormData(e.target).get('q'); if (q) toast('Trợ lý tra cứu', `Đang tìm: “${q}” trong phạm vi ${scope.tenant}`); }}>
-          <div className="h-8 flex items-center gap-2 border border-border-control rounded px-2.5 bg-surface focus-within:border-primary-container focus-within:ring-1 focus-within:ring-primary-container">
-            <Icon name="search" size={16} className="text-text-secondary" />
-            <input name="q" aria-label="Tra cứu" className="bg-transparent outline-none text-body-sm w-full placeholder:text-text-secondary" placeholder="Tra cứu bằng ngôn ngữ tự nhiên" />
-          </div>
-        </form>
-      </div>
-      <div className="flex items-center gap-space-md shrink-0">
-        <span className="hidden 2xl:inline text-caption text-text-secondary whitespace-nowrap">Kiểm toán: Ghi nhật ký đầy đủ</span>
-        <div className="relative" ref={ref}>
-          <button className="relative p-1 rounded-lg text-text-secondary hover:bg-surface-container-low" onClick={() => setOpen((o) => !o)} aria-label="Thông báo">
-            <Icon name="notifications" size={22} />
-            {unread && <span className="w-2 h-2 rounded-full bg-status-rejected absolute top-1 right-1" />}
-          </button>
-          {open && <Notifications onClose={() => setOpen(false)} />}
+    <header className={`fixed top-0 ${railCollapsed ? 'left-16' : 'left-[240px]'} right-0 h-14 bg-surface z-30 border-b border-border-subtle flex items-center justify-between px-space-lg gap-3 transition-[left] duration-200`}>
+      {onDashboard && (
+        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          <Select variant="inline" label="Đơn vị chủ quản" value={scope.tenant} options={TENANTS} onChange={(v) => setScope((s) => ({ ...s, tenant: v }))} />
+          <span className="text-border-strong" aria-hidden>/</span>
+          <Select variant="inline" label="Khoa / Phòng ban" value={scope.unit} options={ORG_UNITS} onChange={(v) => setScope((s) => ({ ...s, unit: v }))} />
+          <span className="text-border-strong" aria-hidden>/</span>
+          <Select variant="inline" label="Đối tượng" value={scope.subject} options={SUBJECT_TYPES} onChange={(v) => setScope((s) => ({ ...s, subject: v }))} />
+          <form className="flex-1 min-w-[200px] max-w-sm ml-3" onSubmit={(e) => { e.preventDefault(); const q = new FormData(e.target).get('q'); if (q) toast('Trợ lý tra cứu', `Đang tìm: “${q}” trong phạm vi ${scope.tenant}`); }}>
+            <div className="h-8 flex items-center gap-2 border border-border-control rounded px-2.5 bg-surface focus-within:border-primary-container focus-within:ring-1 focus-within:ring-primary-container">
+              <Icon name="search" size={16} className="text-text-secondary" />
+              <input name="q" aria-label="Tra cứu" className="bg-transparent outline-none text-body-sm w-full placeholder:text-text-secondary" placeholder="Tra cứu bằng ngôn ngữ tự nhiên" />
+            </div>
+          </form>
         </div>
-        <div className="h-5 w-px bg-border-subtle" />
+      )}
+      <div className="ml-auto flex items-center gap-space-md shrink-0">
+        {onDashboard && (
+          <>
+            <span className="hidden 2xl:inline text-caption text-text-secondary whitespace-nowrap">Kiểm toán: Ghi nhật ký đầy đủ</span>
+            <div className="relative" ref={ref}>
+              <button className="relative p-1 rounded-lg text-text-secondary hover:bg-surface-container-low" onClick={() => setOpen((o) => !o)} aria-label="Thông báo">
+                <Icon name="notifications" size={22} />
+                {unread && <span className="w-2 h-2 rounded-full bg-status-rejected absolute top-1 right-1" />}
+              </button>
+              {open && <Notifications onClose={() => setOpen(false)} />}
+            </div>
+            <div className="h-5 w-px bg-border-subtle" />
+          </>
+        )}
         <div className="flex items-center gap-2.5">
           <div className="text-right"><div className="text-label-md font-medium leading-none">{CURRENT_USER.name}</div><div className="text-caption text-text-secondary mt-0.5">{CURRENT_USER.role}</div></div>
           <div className="w-8 h-8 rounded bg-surface-container flex items-center justify-center text-label-sm font-semibold" aria-hidden>{CURRENT_USER.name.split(' ').slice(-2).map((w) => w[0]).join('')}</div>
@@ -150,6 +178,7 @@ function TopBar() {
 
 export default function Layout() {
   const main = useRef();
+  const { railCollapsed } = useApp();
   const { pathname } = useLocation();
   const previous = useRef(pathname);
   useEffect(() => {
@@ -163,7 +192,7 @@ export default function Layout() {
       <button className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[90] btn-primary" onClick={() => main.current.focus()}>Bỏ qua menu, đến nội dung chính</button>
       <Sidebar />
       <TopBar />
-      <main ref={main} tabIndex={-1} className="pl-[240px] pt-14 outline-none">
+      <main ref={main} tabIndex={-1} className={`${railCollapsed ? 'pl-16' : 'pl-[240px]'} pt-14 outline-none transition-[padding] duration-200`}>
         <div className="mx-auto max-w-[1680px] px-space-lg py-space-md"><Outlet /></div>
       </main>
     </div>

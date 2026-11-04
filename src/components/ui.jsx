@@ -292,11 +292,11 @@ export function ConfirmReason({ open, onClose, onConfirm, title, subtitle, dange
 }
 
 export function Toasts() {
-  const { toasts } = useApp();
+  const { toasts, railCollapsed } = useApp();
   const ic = { success: 'check_circle', warn: 'warning', error: 'error', info: 'info' };
   const col = { success: 'text-status-active', warn: 'text-status-pending', error: 'text-status-rejected', info: 'text-primary-container' };
   return (
-    <div className="fixed bottom-5 left-[256px] z-[80] flex flex-col gap-2 w-[360px]">
+    <div className={`fixed bottom-5 ${railCollapsed ? 'left-[80px]' : 'left-[256px]'} z-[80] flex flex-col gap-2 w-[360px]`}>
       {toasts.map((t) => (
         <div key={t.id} className="bg-surface border border-border-subtle rounded-lg shadow-lg p-3 flex gap-2.5 anim-fade" role="status">
           <Icon name={ic[t.tone]} size={20} className={col[t.tone]} />
