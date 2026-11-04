@@ -2,7 +2,10 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
 import { CURRENT_USER, INITIAL_AUDIT, PROFILES, REQUESTS, NOTIFICATIONS, TENANTS, ORG_UNITS, SUBJECT_TYPES } from './data/mock';
 
 const Ctx = createContext(null);
-const now = () => new Date().toLocaleTimeString('vi-VN', { hour12: false });
+const now = () => {
+  const d = new Date();
+  return `${d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })} ${d.toLocaleTimeString('vi-VN', { hour12: false })}`;
+};
 
 export function AppProvider({ children }) {
   const [scope, setScope] = useState({ tenant: TENANTS[0], unit: ORG_UNITS[0], subject: SUBJECT_TYPES[0] });

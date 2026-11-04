@@ -188,17 +188,50 @@ export function Select({ value, onChange, options, label, placeholder = 'Chọn�
   );
 }
 
-export function Modal({ open, onClose, children, width = 'max-w-xl' }) {
+const dialogStack = [];
+
+/** Hành vi chung của hộp thoại: giữ focus bên trong, Esc chỉ đóng hộp trên cùng, trả focus khi đóng. */
+function useDialog(open, onClose) {
+  const ref = useRef();
+  const close = useRef(onClose);
+  close.current = onClose;
+  const id = useId();
   useEffect(() => {
     if (!open) return;
-    const h = (e) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [open, onClose]);
+    const token = {};
+    dialogStack.push(token);
+    const previous = document.activeElement;
+    const el = ref.current;
+    const focusables = () => [...el.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex="0"]')];
+    const heading = el.querySelector('h2, h3');
+    if (heading) { heading.id ||= id; el.setAttribute('aria-labelledby', heading.id); }
+    if (!el.contains(document.activeElement)) (focusables()[0] || el).focus();
+    const onKey = (e) => {
+      if (dialogStack[dialogStack.length - 1] !== token) return;
+      if (e.key === 'Escape') { close.current(); return; }
+      if (e.key !== 'Tab') return;
+      const items = focusables();
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      dialogStack.splice(dialogStack.indexOf(token), 1);
+      if (previous?.isConnected) previous.focus();
+    };
+  }, [open, id]);
+  return ref;
+}
+
+export function Modal({ open, onClose, children, width = 'max-w-xl' }) {
+  const ref = useDialog(open, onClose);
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50" onClick={onClose}>
-      <div className={`w-full ${width} bg-surface rounded-xl shadow-xl overflow-hidden flex flex-col anim-fade max-h-[92vh]`} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal>
+      <div ref={ref} tabIndex={-1} className={`w-full ${width} bg-surface rounded-xl shadow-xl overflow-hidden flex flex-col anim-fade max-h-[92vh] outline-none`} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
         {children}
       </div>
     </div>
@@ -206,16 +239,11 @@ export function Modal({ open, onClose, children, width = 'max-w-xl' }) {
 }
 
 export function Drawer({ open, onClose, children, width = 480 }) {
-  useEffect(() => {
-    if (!open) return;
-    const h = (e) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [open, onClose]);
+  const ref = useDialog(open, onClose);
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[55] flex justify-end bg-slate-900/30" onClick={onClose}>
-      <div className="h-full bg-surface shadow-xl border-l border-border-subtle flex flex-col anim-slide" style={{ width }} onClick={(e) => e.stopPropagation()}>
+      <div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" className="h-full bg-surface shadow-xl border-l border-border-subtle flex flex-col anim-slide outline-none" style={{ width }} onClick={(e) => e.stopPropagation()}>
         {children}
       </div>
     </div>

@@ -27,7 +27,7 @@ export default function Soc() {
       <div className="grid grid-cols-12 gap-space-md items-start">
         <div className="col-span-5 card divide-y divide-border-subtle overflow-hidden">
           {events.map((e) => (
-            <button key={e.id} onClick={() => setSel(e.id)} className={`w-full text-left p-3 flex gap-3 border-l-4 ${sel === e.id ? 'bg-surface-container-low border-l-primary-container' : 'border-l-transparent hover:bg-surface-container-low/50'} ${e.state !== 'open' ? 'opacity-70' : ''}`}>
+            <button key={e.id} onClick={() => setSel(e.id)} className={`w-full text-left p-3 flex gap-3 border-l-4 ${sel === e.id ? 'bg-surface-container-low border-l-primary-container' : 'border-l-transparent hover:bg-surface-container-low/50'}`}>
               <span className={`w-2.5 h-2.5 rounded-full mt-1.5 ${e.level === 'critical' ? 'bg-status-rejected' : e.level === 'warning' ? 'bg-status-pending' : 'bg-status-inactive'} ${e.state === 'open' && e.level === 'critical' ? 'animate-pulse' : ''}`} />
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between"><span className="text-label-md font-semibold">{e.title}</span><span className="font-mono text-caption text-text-secondary">{e.time}</span></div>

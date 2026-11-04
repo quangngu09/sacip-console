@@ -78,7 +78,7 @@ export default function Requests() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       {closed ? <StatusPill status={r.status} /> : <>
-                        <span className={`chip ${r.slaUrgent ? 'bg-status-rejected/10 text-status-rejected animate-pulse' : 'bg-surface-container text-text-secondary'}`}><Icon name="alarm" size={13} />{r.sla}</span>
+                        <span className={`chip ${r.slaUrgent ? 'bg-status-rejected/10 text-status-rejected' :'bg-surface-container text-text-secondary'}`}><Icon name="alarm" size={13} />{r.sla}</span>
                         {prioColor[r.priority] && <span className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${prioColor[r.priority]}`}>{r.priority}</span>}
                       </>}
                     </div>
@@ -287,7 +287,7 @@ function ApproveModal({ open, r, onClose, onConfirm }) {
   const [reason, setReason] = useState('');
   const [sms, setSms] = useState(true);
   const [keep, setKeep] = useState(true);
-  useEffect(() => { if (open) setReason(r.kind === 'rescan' ? 'Chấp thuận theo đề xuất của Cố vấn học tập. Ảnh cũ Kiosk 03 bị specular highlight và lệch yaw 22 độ. Mở quyền chụp lại tại Kiosk 01 trong 48 giờ.' : ''); }, [open, r]);
+  useEffect(() => { if (open) setReason(''); }, [open, r]);
   const ok = reason.trim().length >= 10;
   return (
     <Modal open={open} onClose={onClose}>

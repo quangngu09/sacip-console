@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Icon, Chip, PageHeader, Modal, Select } from '../components/ui';
+import { Icon, Chip, PageHeader, Modal, Select, ConfirmReason } from '../components/ui';
 import { useApp } from '../store';
 import { RULES } from '../data/mock';
 
@@ -14,6 +14,7 @@ export default function Policies() {
   const [editor, setEditor] = useState(false);
   const [form, setForm] = useState({ name: '', group: GROUPS[0], space: SPACES[0], time: TIMES[0], action: ACTIONS[0] });
   const [dry, setDry] = useState(null);
+  const [toggleAsk, setToggleAsk] = useState(null);
 
   const runDry = () => {
     const rt = form.action.includes('SOC');
@@ -54,7 +55,7 @@ export default function Policies() {
                 <td className="px-3">{r.type === 'realtime' ? <Chip color="status-rejected" icon="bolt">Real-time</Chip> : <Chip color="primary">Audit</Chip>}</td>
                 <td className="px-3 tabular-nums">{r.hits.toLocaleString('vi-VN')}</td>
                 <td className="px-3">
-                  <button role="switch" aria-checked={r.enabled} onClick={() => { setRules((rs) => rs.map((x) => (x.id === r.id ? { ...x, enabled: !x.enabled } : x))); log(`${r.enabled ? 'Tắt' : 'Bật'} rule ${r.id}`, r.id); }}
+                  <button role="switch" aria-checked={r.enabled} aria-label={`${r.enabled ? 'Tắt' : 'Bật'} rule ${r.id}: ${r.name}`} onClick={() => setToggleAsk(r)}
                     className={`w-10 h-5 rounded-full relative transition-colors ${r.enabled ? 'bg-status-active' : 'bg-border-strong'}`}>
                     <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${r.enabled ? 'left-[22px]' : 'left-0.5'}`} />
                   </button>
@@ -96,6 +97,11 @@ export default function Policies() {
           <button className="btn-primary disabled:opacity-40" disabled={!dry || dry.conflicts > 0} title={!dry ? 'Cần chạy Dry-Run trước' : ''} onClick={() => save(true)}><Icon name="check" />Áp dụng thật</button>
         </div>
       </Modal>
+
+      <ConfirmReason open={!!toggleAsk} onClose={() => setToggleAsk(null)} danger={toggleAsk?.enabled} title={`${toggleAsk?.enabled ? 'Tắt' : 'Bật'} rule ${toggleAsk?.id}`} subtitle={toggleAsk?.name} confirmLabel={toggleAsk?.enabled ? 'Xác nhận tắt' : 'Xác nhận bật'}
+        onConfirm={(reason) => { const r = toggleAsk; setRules((rs) => rs.map((x) => (x.id === r.id ? { ...x, enabled: !x.enabled } : x))); log(`${r.enabled ? 'Tắt' : 'Bật'} rule ${r.id} — ${reason}`, r.id); toast(`Đã ${r.enabled ? 'tắt' : 'bật'} rule`, `${r.id} • ${r.name}`, r.enabled ? 'warn' : 'success'); setToggleAsk(null); }}>
+        {toggleAsk?.enabled && toggleAsk.type === 'realtime' && <div className="p-3 rounded-lg bg-status-rejected/10 text-status-rejected text-body-sm">Đây là cảnh báo an ninh thời gian thực. Khi tắt, hệ thống sẽ không còi và không báo SOC cho tình huống này.</div>}
+      </ConfirmReason>
     </div>
   );
 }

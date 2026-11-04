@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Icon, Modal, Select } from '../components/ui';
+import { ConfirmReason, FaceThumb, Icon, Modal, Select } from '../components/ui';
 import { useApp } from '../store';
 import { useCameras, grabFrame } from '../hooks/useCameras';
 
@@ -102,6 +102,9 @@ export default function Kiosk() {
   const countRef = useRef();
   const mainVideo = useRef();
   const [shot, setShot] = useState(null);
+  const [revealed, setRevealed] = useState(false);
+  const [revealAsk, setRevealAsk] = useState(false);
+  const [cancelAsk, setCancelAsk] = useState(false);
   const cams = useCameras(4);
   const liveCount = cams.slots.filter((s) => s?.stream).length;
 
@@ -118,7 +121,9 @@ export default function Kiosk() {
 
   const load = useCallback((s, title = 'Đã nạp hồ sơ') => { setStudent(s); setPhase('ready'); flash(title, `${s.name} (${s.id})`, 'success'); log('Kiosk nạp hồ sơ sinh viên', s.id, 'system'); }, [flash, log]);
   const scan = useCallback(() => load(QUEUE[0], 'Đã nhận diện thẻ RFID/CCCD'), [load]);
-  const reset = useCallback(() => { clearInterval(countRef.current); setStudent(null); setPhase('idle'); setShot(null); }, []);
+  const reset = useCallback(() => { clearInterval(countRef.current); setStudent(null); setPhase('idle'); setShot(null); setRevealed(false); setCancelAsk(false); }, []);
+  // Đã có ảnh chưa lưu thì phải hỏi lại, tránh mất ảnh khi lỡ bấm Esc.
+  const requestCancel = useCallback(() => { if (shot) setCancelAsk(true); else reset(); }, [shot, reset]);
 
   const capture = () => {
     if (!cams.primary?.stream) { flash('Chưa có camera', cams.error || 'Không có luồng hình từ camera chính.', 'warn'); return; }
@@ -139,15 +144,15 @@ export default function Kiosk() {
 
   useEffect(() => {
     const h = (e) => {
-      if (manual) { if (e.key === 'Escape') setManual(false); return; }
+      if (manual || revealAsk || cancelAsk) return; // hộp thoại đang mở tự xử lý phím của nó
       // Space trên nút/ô đang focus phải kích hoạt chính phần tử đó, không phải quét thẻ.
       if (e.code === 'Space' && phase === 'idle' && !e.target.closest?.('button, a, input, textarea')) { e.preventDefault(); scan(); }
       if (e.key === 'F2') { e.preventDefault(); setManual(true); }
       if (e.key === 'F4') { e.preventDefault(); testFlash(); }
-      if (e.key === 'Escape') reset();
+      if (e.key === 'Escape') requestCancel();
     };
     window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);
-  }, [manual, phase, scan, testFlash, reset]);
+  }, [manual, revealAsk, cancelAsk, phase, scan, testFlash, requestCancel]);
 
   const done = phase === 'ok' || phase === 'printed';
 
@@ -248,7 +253,7 @@ export default function Kiosk() {
             <section className="col-span-8 card p-4">
               <div className="flex items-center justify-between gap-3 mb-3">
                 <h2 className="text-k-title-md">Chụp ảnh đa góc</h2>
-                <div className="flex items-center gap-2"><CamPicker cams={cams} onPicked={(name) => flash('Đã đổi camera chính', name)} /><button className="h-10 px-3 rounded-lg border border-border-strong hover:bg-surface-container-low text-k-label-md flex items-center gap-1.5 whitespace-nowrap" onClick={reset}>Hủy phiên<Kbd>Esc</Kbd></button></div>
+                <div className="flex items-center gap-2"><CamPicker cams={cams} onPicked={(name) => flash('Đã đổi camera chính', name)} /><button className="h-10 px-3 rounded-lg border border-border-strong hover:bg-surface-container-low text-k-label-md flex items-center gap-1.5 whitespace-nowrap" onClick={requestCancel}>Hủy phiên<Kbd>Esc</Kbd></button></div>
               </div>
               <div className="relative">
                 <CamView big videoRef={mainVideo} slot={cams.primary} label="CAM 1: Trực diện" status={done ? 'Đã chụp' : 'Đang căn chỉnh'} phase={phase} />
@@ -267,10 +272,12 @@ export default function Kiosk() {
                 <div className="text-k-title-md">{student.name}</div>
                 <div className="text-k-caption font-normal text-text-secondary"><span className="font-mono text-text-primary">{student.id}</span> • K69A • {student.unit}</div>
                 <div className="mt-3 pt-3 border-t border-border-subtle flex items-center gap-3">
-                  <div className="w-14 h-16 rounded bg-surface-container-high flex items-center justify-center text-text-secondary shrink-0" title="Màn che riêng tư"><Icon name="visibility_off" size={22} /></div>
+                  <FaceThumb seed={student.no ? Number(student.no) : 1} size={64} round={false} revealed={revealed} />
                   <div className="min-w-0">
-                    <div className="text-caption text-text-secondary">Ảnh cũ được che khi màn hình chờ.</div>
-                    <button className="mt-1.5 h-9 px-3 rounded border border-border-strong hover:bg-surface-container-low text-label-md" onClick={() => { log('Kiosk: xem rõ ảnh cũ', student.id, 'sensitive'); flash('Đã ghi nhận nhật ký', 'Thao tác xem ảnh được lưu vết.'); }}>Xem rõ (ghi nhật ký)</button>
+                    <div className="text-caption text-text-secondary">{revealed ? 'Đang hiển thị ảnh cũ. Thao tác đã ghi nhật ký.' : 'Ảnh cũ được che khi màn hình chờ.'}</div>
+                    {revealed
+                      ? <button className="mt-1.5 h-9 px-3 rounded border border-border-strong hover:bg-surface-container-low text-label-md" onClick={() => setRevealed(false)}>Làm mờ lại</button>
+                      : <button className="mt-1.5 h-9 px-3 rounded border border-border-strong hover:bg-surface-container-low text-label-md" onClick={() => setRevealAsk(true)}>Xem rõ (ghi nhật ký)</button>}
                   </div>
                 </div>
                 {phase === 'printed' && <div className="mt-3 p-2.5 rounded bg-status-active/10 text-status-active text-k-label-md flex items-center gap-2" role="status"><Icon name="check_circle" />Thẻ đã in — giao cho sinh viên và bấm “Lưu hồ sơ”.</div>}
@@ -310,6 +317,20 @@ export default function Kiosk() {
           <div className="min-w-0"><div className="text-k-label-md">{toast.title}</div>{toast.desc && <div className="text-caption text-text-secondary">{toast.desc}</div>}</div>
         </div>
       )}
+
+      <ConfirmReason open={revealAsk} onClose={() => setRevealAsk(false)} title="Xem rõ ảnh cũ" subtitle={student && `${student.name} • ${student.id}`} minLength={5}
+        onConfirm={(reason) => { setRevealed(true); setRevealAsk(false); log(`Kiosk: xem rõ ảnh cũ — ${reason}`, student.id, 'sensitive'); flash('Đã giải mờ ảnh', 'Thao tác đã được ghi nhật ký.', 'warn'); }} />
+
+      <Modal open={cancelAsk} onClose={() => setCancelAsk(false)} width="max-w-md">
+        <div className="p-6">
+          <h3 className="text-k-title-lg">Hủy phiên chụp?</h3>
+          <p className="text-k-body text-text-secondary mt-1">Ảnh vừa chụp của {student?.name} chưa được lưu và sẽ bị xóa.</p>
+          <div className="mt-6 flex justify-end gap-3">
+            <button className={actionBtn(false)} onClick={() => setCancelAsk(false)}>Tiếp tục phiên</button>
+            <button className="h-14 px-4 rounded-lg text-k-label-lg bg-status-rejected text-white hover:bg-red-800" onClick={reset}>Hủy và xóa ảnh</button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal open={manual} onClose={() => setManual(false)}>
         <form className="p-6" onSubmit={(e) => { e.preventDefault(); if (!mssv.trim()) return; setManual(false); load({ name: 'Sinh viên tra cứu', id: mssv.trim(), unit: 'Đang tải từ IAM' }); setMssv(''); }}>

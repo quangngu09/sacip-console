@@ -19,7 +19,7 @@ export default function Schedule() {
       <div className="card overflow-hidden mb-space-md">
         <table className="w-full text-left text-body-sm">
           <thead className="bg-surface-bright"><tr className="h-10 text-[12px] uppercase tracking-wider text-text-secondary">
-            {['Khung giờ', 'Phòng', 'Học phần / Lớp', 'Giảng viên', 'PRESENT', 'LATE', 'Vắng', 'Ghi hình bài giảng', ''].map((h) => <th key={h} className="px-3 font-medium">{h}</th>)}
+            {['Khung giờ', 'Phòng', 'Học phần / Lớp', 'Giảng viên', 'PRESENT', 'LATE', 'Vắng', 'Ghi hình bài giảng', 'Thao tác'].map((h) => <th key={h} className="px-3 font-medium">{h}</th>)}
           </tr></thead>
           <tbody>
             {SCHEDULE.map((s, i) => (

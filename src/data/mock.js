@@ -113,12 +113,12 @@ export const SOC_EVENTS = [
 ];
 
 export const INITIAL_AUDIT = [
-  { t: '16:35:02', actor: 'Lê Hoàng Minh', action: 'Mở xem chi tiết hồ sơ', target: 'SV-2024-1102', kind: 'view' },
-  { t: '16:32:09', actor: 'Policy Engine', action: 'Kích hoạt R-004 (Restricted Zone)', target: 'EV-99121', kind: 'alert' },
-  { t: '14:32:40', actor: 'KIOSK_03', action: 'Tải lên gói dữ liệu nhận diện đa góc', target: 'SV-2024-1102', kind: 'system' },
-  { t: '14:30:11', actor: 'IAM', action: 'Xác thực chip CCCD thành công', target: 'SV-2024-1102', kind: 'system' },
-  { t: '14:21:03', actor: 'AI-ENGINE v4.1', action: 'Confidence 94.2%, yaw 22°', target: 'YC-2025-0842', kind: 'ai' },
-  { t: '14:20:45', actor: 'App MyDaiNam', action: 'Tạo yêu cầu chụp lại', target: 'YC-2025-0842', kind: 'system' },
+  { t: '24/10/2025 16:35:02', actor: 'Lê Hoàng Minh', action: 'Mở xem chi tiết hồ sơ', target: 'SV-2024-1102', kind: 'view' },
+  { t: '24/10/2025 16:32:09', actor: 'Policy Engine', action: 'Kích hoạt R-004 (Restricted Zone)', target: 'EV-99121', kind: 'alert' },
+  { t: '24/10/2025 14:32:40', actor: 'KIOSK_03', action: 'Tải lên gói dữ liệu nhận diện đa góc', target: 'SV-2024-1102', kind: 'system' },
+  { t: '24/10/2025 14:30:11', actor: 'IAM', action: 'Xác thực chip CCCD thành công', target: 'SV-2024-1102', kind: 'system' },
+  { t: '24/10/2025 14:21:03', actor: 'AI-ENGINE v4.1', action: 'Confidence 94.2%, yaw 22°', target: 'YC-2025-0842', kind: 'ai' },
+  { t: '24/10/2025 14:20:45', actor: 'App MyDaiNam', action: 'Tạo yêu cầu chụp lại', target: 'YC-2025-0842', kind: 'system' },
 ];
 
 export const CONSENTS = [

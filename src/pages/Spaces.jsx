@@ -103,7 +103,7 @@ export default function Spaces() {
                 )}
               </div>
 
-              <div className={`p-3 rounded-lg border border-border-subtle ${room.approved ? '' : 'opacity-60'}`}>
+              <div className="p-3 rounded-lg border border-border-subtle">
                 <div className="text-label-md font-semibold mb-2 flex items-center gap-1.5"><Icon name="add_link" />Gán thiết bị vào phòng</div>
                 <div className="flex gap-2">
                   <Select className="min-w-0 flex-1" label="Thiết bị chưa gán" placeholder="Chọn thiết bị chưa gán" value={assign} options={free.map((d) => ({ value: d.id, label: `${d.id} • ${d.kind}` }))} onChange={setAssign} disabled={!room.approved} />

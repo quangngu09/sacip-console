@@ -38,15 +38,16 @@ export function AiMonitor() {
 }
 
 const kindIcon = { view: 'visibility', alert: 'notifications_active', system: 'settings', ai: 'smart_toy', user: 'person', sensitive: 'gpp_maybe' };
+const kindLabel = { view: 'Xem hồ sơ', alert: 'Cảnh báo', system: 'Hệ thống', ai: 'AI', user: 'Thao tác cán bộ', sensitive: 'Dữ liệu nhạy cảm' };
 
 export function AuditLog() {
-  const { audit, toast } = useApp();
+  const { audit, log, toast } = useApp();
   const [f, setF] = useState('all');
   const rows = audit.filter((a) => f === 'all' || a.kind === f);
   return (
     <div>
       <PageHeader icon="receipt_long" title="Nhật ký & Báo cáo" desc="Immutable Audit Log • mọi thao tác nhạy cảm (xem ảnh, phê duyệt, khóa, đổi rule) đều được ghi kèm người thực hiện"
-        actions={<button className="btn-outline" onClick={() => toast('Đã xuất báo cáo kiểm toán', 'Báo cáo chỉ gồm metadata, không kèm ảnh khuôn mặt.', 'success')}><Icon name="download" />Xuất báo cáo thanh tra</button>} />
+        actions={<button className="btn-outline" onClick={() => { log('Xuất báo cáo thanh tra (không kèm ảnh)', 'Nhật ký & Báo cáo'); toast('Đã xuất báo cáo kiểm toán', 'Báo cáo chỉ gồm metadata, không kèm ảnh khuôn mặt.', 'success'); }}><Icon name="download" />Xuất báo cáo thanh tra</button>} />
       <div className="flex gap-1 mb-space-sm">
         {[['all', 'Tất cả'], ['user', 'Thao tác cán bộ'], ['sensitive', 'Xem dữ liệu nhạy cảm'], ['alert', 'Cảnh báo'], ['ai', 'AI'], ['system', 'Hệ thống']].map(([k, l]) => (
           <button key={k} onClick={() => setF(k)} className={`px-3 py-1 rounded-full text-label-sm ${f === k ? 'bg-primary-container text-white' : 'bg-surface shadow-soft hover:bg-surface-container-low'}`}>{l}</button>
@@ -57,8 +58,8 @@ export function AuditLog() {
           <thead className="bg-surface-bright"><tr className="h-10 text-[12px] uppercase tracking-wider text-text-secondary">{['Thời gian', 'Loại', 'Người / tác nhân', 'Hành động', 'Đối tượng'].map((h) => <th key={h} className="px-3 font-medium">{h}</th>)}</tr></thead>
           <tbody>{rows.map((a, i) => (
             <tr key={i} className={`h-11 border-t border-border-subtle/60 ${a.kind === 'sensitive' ? 'bg-status-pending/5' : ''}`}>
-              <td className="px-3 font-mono text-caption">{a.t}</td>
-              <td className="px-3"><Icon name={kindIcon[a.kind]} className={a.kind === 'sensitive' ? 'text-status-pending' : 'text-text-secondary'} /></td>
+              <td className="px-3 font-mono text-caption whitespace-nowrap">{a.t}</td>
+              <td className="px-3 whitespace-nowrap"><span className={`inline-flex items-center gap-1.5 ${a.kind === 'sensitive' ? 'text-status-pending' : 'text-text-secondary'}`}><Icon name={kindIcon[a.kind]} size={16} />{kindLabel[a.kind]}</span></td>
               <td className="px-3 font-medium">{a.actor}</td>
               <td className="px-3">{a.action}</td>
               <td className="px-3 font-mono text-caption">{a.target}</td>
@@ -81,7 +82,7 @@ export function Consents() {
       <PageHeader icon="verified_user" title="Đồng ý xử lý dữ liệu (NĐ 13/2023)" desc="Quản lý cam kết, mục đích xử lý và quyền rút đồng ý của chủ thể dữ liệu. Rút đồng ý luôn có phương án thay thế phi sinh trắc." />
       <div className="card overflow-hidden">
         <table className="w-full text-left text-body-sm">
-          <thead className="bg-surface-bright"><tr className="h-10 text-[12px] uppercase tracking-wider text-text-secondary">{['Mã đối tượng', 'Họ tên', 'Mục đích xử lý', 'Ngày ký', 'Kênh ký', 'Trạng thái', ''].map((h) => <th key={h} className="px-3 font-medium">{h}</th>)}</tr></thead>
+          <thead className="bg-surface-bright"><tr className="h-10 text-[12px] uppercase tracking-wider text-text-secondary">{['Mã đối tượng', 'Họ tên', 'Mục đích xử lý', 'Ngày ký', 'Kênh ký', 'Trạng thái', 'Thao tác'].map((h) => <th key={h} className="px-3 font-medium">{h}</th>)}</tr></thead>
           <tbody>{rows.map((c) => (
             <tr key={c.id} className="h-12 border-t border-border-subtle/60 hover:bg-surface-container-low">
               <td className="px-3 font-mono font-semibold">{c.id}</td><td className="px-3">{c.name}</td><td className="px-3">{c.purpose}</td><td className="px-3">{c.signed}</td><td className="px-3 text-caption">{c.channel}</td>

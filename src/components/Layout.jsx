@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Icon, Select } from './ui';
 import { useApp } from '../store';
 import { CURRENT_USER, TENANTS, ORG_UNITS, SUBJECT_TYPES } from '../data/mock';
@@ -145,11 +145,20 @@ function TopBar() {
 }
 
 export default function Layout() {
+  const main = useRef();
+  const { pathname } = useLocation();
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) { first.current = false; return; }
+    window.scrollTo(0, 0);
+    main.current.focus({ preventScroll: true });
+  }, [pathname]);
   return (
     <div className="min-h-screen">
+      <button className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[90] btn-primary" onClick={() => main.current.focus()}>Bỏ qua menu, đến nội dung chính</button>
       <Sidebar />
       <TopBar />
-      <main className="pl-[240px] pt-14">
+      <main ref={main} tabIndex={-1} className="pl-[240px] pt-14 outline-none">
         <div className="px-space-lg py-space-md"><Outlet /></div>
       </main>
     </div>

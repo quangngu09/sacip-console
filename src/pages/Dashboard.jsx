@@ -72,7 +72,7 @@ function AttendanceChart() {
             <g key={p.d}>
               <circle cx={x(p.i)} cy={y(p.v)} r="4" strokeWidth="2" className="fill-primary-container stroke-surface" />
               {LABELLED.includes(p.d) && active !== p.i && <text x={x(p.i)} y={y(p.v) + (p.d === 'T6' ? 20 : -10)} textAnchor="middle" className="fill-text-primary text-[12px] font-medium tabular-nums">{p.v}%</text>}
-              <rect x={x(p.i) - band / 2} y={pad.t} width={band} height={H - pad.t - pad.b} fill="transparent" tabIndex={0} aria-label={`${p.d}: ${p.v}%`} onMouseEnter={() => setActive(p.i)} onFocus={() => setActive(p.i)} onBlur={() => setActive(null)} />
+              <rect x={x(p.i) - band / 2} y={pad.t} width={band} height={H - pad.t - pad.b} fill="transparent" role="img" tabIndex={0} aria-label={`${p.d}: ${p.v}%`} onMouseEnter={() => setActive(p.i)} onFocus={() => setActive(p.i)} onBlur={() => setActive(null)} />
             </g>
           ))}
         </svg>

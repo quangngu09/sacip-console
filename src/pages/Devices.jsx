@@ -29,7 +29,7 @@ export default function Devices() {
       <div className="card overflow-x-auto">
         <table className="w-full text-left text-body-sm">
           <thead className="bg-surface-bright sticky top-0"><tr className="h-10 text-[12px] uppercase tracking-wider text-text-secondary">
-            {['Device ID', 'Loại', 'Hãng', 'IP', 'MAC / BSSID / UUID', 'Port Switch', 'Serial', 'Room_ID', 'Trạng thái', 'NTP', ''].map((h) => <th key={h} className="px-3 font-medium whitespace-nowrap">{h}</th>)}
+            {['Device ID', 'Loại', 'Hãng', 'IP', 'MAC / BSSID / UUID', 'Port Switch', 'Serial', 'Room_ID', 'Trạng thái', 'NTP', 'Thao tác'].map((h) => <th key={h} className="px-3 font-medium whitespace-nowrap">{h}</th>)}
           </tr></thead>
           <tbody>
             {rows.map((d) => (
