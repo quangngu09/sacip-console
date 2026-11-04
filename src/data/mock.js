@@ -13,7 +13,7 @@ export const PROFILES = [
   { id: 'KTX-2023-441', name: 'Phạm Quốc Bảo', email: 'bao.pq@dorm.uni.edu.vn', type: 'Cư dân KTX', unit: 'KTX Tòa B (P.402)', source: 'Ảnh thẻ kiosk', status: 'collected', validity: 'Sắp hết hạn (15 ngày)', expiring: true, score: 91, risk: null, seed: 4 },
   { id: 'NV-2022-019', name: 'Vũ Thị Mai Anh', email: 'maianh.vt@staff.edu.vn', type: 'Cán bộ', unit: 'Phòng Hành chính - QT', source: 'Ảnh thẻ kiosk', status: 'pending', validity: 'Chờ kích hoạt', score: 89, risk: null, seed: 5 },
   { id: 'EXT-2024-008', name: 'Đoàn Văn Hùng', email: 'hung.dv@vendingpartner.vn', type: 'NV thuê ngoài', unit: 'Đơn vị Căn-tin', source: 'Nhập tại quầy', status: 'locked', validity: 'Đã vô hiệu hóa', score: 48, risk: 'Nghi dùng ảnh in', seed: 6 },
-  { id: 'SV-2024-9912', name: 'Hoàng Đỗ Gia Hân', email: 'giahan.hd24@student.edu.vn', type: 'Sinh viên', unit: 'Khoa Ngoại ngữ', source: null, status: 'none', validity: null, score: null, risk: null, seed: 7 },
+  { id: 'SV-2024-9912', name: 'Trương Gia Huy', email: 'giahuy.tg24@student.edu.vn', type: 'Sinh viên', unit: 'Khoa Ngoại ngữ', source: null, status: 'none', validity: null, score: null, risk: null, seed: 7 },
   { id: 'SV-2023-5521', name: 'Trịnh Bảo Ngọc', email: 'ngoc.tb23@student.edu.vn', type: 'Sinh viên', unit: 'Khoa CNTT', source: 'Camera cổng', status: 'collected', validity: '30/06/2027', score: 93, risk: null, seed: 8 },
   { id: 'GV-2020-117', name: 'ThS. Nguyễn Văn An', email: 'an.nv@uni.edu.vn', type: 'Giảng viên', unit: 'Khoa Kinh tế & QTKD', source: 'Nhập tại quầy', status: 'collected', validity: '31/12/2027', score: 96, risk: null, seed: 9 },
   { id: 'SV-2022-3340', name: 'Đặng Thu Hà', email: 'ha.dt22@student.edu.vn', type: 'Sinh viên', unit: 'Khoa Điện - Điện tử', source: 'App MyDaiNam', status: 'pending', validity: 'Chờ kích hoạt', score: 87, risk: null, seed: 10 },
@@ -44,8 +44,8 @@ export const REQUESTS = [
 
 export const NOTIFICATIONS = [
   { id: 1, color: 'status-rejected', title: 'Rút đồng ý Face ID (NĐ 13)', time: '5 phút trước', body: 'Sinh viên Hoàng Đỗ Gia Hân (SV-2023-4509) gửi yêu cầu thu hồi template khuôn mặt.', unread: true },
-  { id: 2, color: 'status-pending', title: 'Yêu cầu sắp quá SLA', time: '18 phút trước', body: 'YC-2025-0839 (Khóa / Thu hồi) còn 01h 15m để xử lý.', unread: true },
-  { id: 3, color: 'status-rejected', title: 'Cảnh báo SOC: Restricted Zone', time: '25 phút trước', body: 'Đối tượng lạ xuất hiện tại Phòng Server tầng 5 nhà A. Đã kích hoạt còi tại chỗ.', unread: true, alert: true },
+  { id: 2, color: 'status-pending', title: 'Yêu cầu sắp quá hạn', time: '18 phút trước', body: 'YC-2025-0839 (Khóa / Thu hồi) còn 01h 15m để xử lý.', unread: true },
+  { id: 3, color: 'status-rejected', title: 'Cảnh báo an ninh: khu vực hạn chế', time: '25 phút trước', body: 'Đối tượng lạ xuất hiện tại Phòng Server tầng 5 nhà A. Đã kích hoạt còi tại chỗ.', unread: true, alert: true },
   { id: 4, color: 'transparent', title: 'Kiosk 01 đồng bộ thành công', time: '1 giờ trước', body: 'Danh sách thu hồi quyền đã nạp vào Kiosk Nhà A.', unread: false },
 ];
 
@@ -80,8 +80,8 @@ export const DEVICES = [
   { id: 'CAM_C301_01', kind: 'Camera AI 4K', vendor: 'Hikvision', ip: '10.20.3.41', mac: 'A4:14:37:9C:02:0F', port: 'SW-C3 / Gi1/0/11 PoE', serial: 'DS2CD-K48807', room: 'C301', online: true, ntp: true },
   { id: 'CAM_A501_01', kind: 'Camera AI 4K', vendor: 'Dahua', ip: '10.10.5.11', mac: '3C:EF:8C:11:20:AA', port: 'SW-A5 / Gi1/0/2 PoE', serial: 'IPC-HFW5841', room: 'A501', online: true, ntp: true },
   { id: 'CAM_A101_01', kind: 'Camera AI 4K', vendor: 'Dahua', ip: '10.10.1.15', mac: '3C:EF:8C:11:20:B4', port: 'SW-A1 / Gi1/0/5 PoE', serial: 'IPC-HFW5850', room: 'A101', online: false, ntp: false },
-  { id: 'EDGE_C3_01', kind: 'Edge Box (Jetson Orin NX)', vendor: 'NVIDIA', ip: '10.20.3.200', mac: '48:B0:2D:5E:71:03', port: 'SW-C3 / Gi1/0/24', serial: 'ORIN-NX16-0091', room: 'C302', online: true, ntp: true },
-  { id: 'NVR_C_01', kind: 'NVR / Đầu ghi', vendor: 'Hikvision', ip: '10.20.0.10', mac: 'A4:14:37:00:10:01', port: 'SW-CORE / Te1/0/3', serial: 'DS-9632NI-0021', room: 'C301', online: true, ntp: true },
+  { id: 'EDGE_C3_01', kind: 'Thiết bị xử lý (Jetson Orin NX)', vendor: 'NVIDIA', ip: '10.20.3.200', mac: '48:B0:2D:5E:71:03', port: 'SW-C3 / Gi1/0/24', serial: 'ORIN-NX16-0091', room: 'C302', online: true, ntp: true },
+  { id: 'NVR_C_01', kind: 'Đầu ghi hình', vendor: 'Hikvision', ip: '10.20.0.10', mac: 'A4:14:37:00:10:01', port: 'SW-CORE / Te1/0/3', serial: 'DS-9632NI-0021', room: 'C301', online: true, ntp: true },
   { id: 'AP_C3_01', kind: 'Wi-Fi AP', vendor: 'Aruba', ip: '10.20.3.5', mac: 'BSSID 20:4C:03:AA:91:C0', port: 'SW-C3 / Gi1/0/1', serial: 'AP535-7781', room: 'C301', online: true, ntp: true },
   { id: 'BLE_C302', kind: 'BLE Beacon', vendor: 'Kontakt', ip: '—', mac: 'UUID f7826da6-…-c302', port: '—', serial: 'BCN-C302', room: 'C302', online: true, ntp: false },
   { id: 'KIOSK_03', kind: 'Kiosk chụp ảnh', vendor: 'DNU Capture Studio', ip: '10.10.1.33', mac: '00:1B:21:3A:4F:03', port: 'SW-A1 / Gi1/0/9', serial: 'KSK-2025-03', room: 'A102', online: true, ntp: true },
@@ -89,12 +89,12 @@ export const DEVICES = [
 ];
 
 export const RULES = [
-  { id: 'R-001', name: 'Điểm danh lớp học theo TKB', group: 'Sinh viên lớp học phần', space: 'Phòng học (Tòa C)', time: 'Theo TKB — ±15 phút', action: 'Ghi PRESENT / LATE, tích lũy ≥80% session', type: 'audit', enabled: true, hits: 18420 },
-  { id: 'R-002', name: 'Kích hoạt ghi hình bài giảng', group: 'Giảng viên phụ trách môn', space: 'Phòng học có NVR', time: 'Theo TKB', action: 'ISAPI Start/Stop NVR + đánh dấu Start/End', type: 'audit', enabled: true, hits: 612 },
-  { id: 'R-003', name: 'Cảnh báo Blacklist tại cổng', group: 'Danh sách Blacklist', space: 'Cổng & Sảnh (Public)', time: '24/7', action: 'Còi tại chỗ + Push SOC (≤2s)', type: 'realtime', enabled: true, hits: 3 },
-  { id: 'R-004', name: 'Xâm nhập Restricted Zone', group: 'Không có quyền', space: 'Phòng Server A501', time: '24/7', action: 'Còi tại chỗ + Push SOC (≤2s)', type: 'realtime', enabled: true, hits: 1 },
-  { id: 'R-005', name: 'Dạy thay / đổi lịch chưa xin phép', group: 'Giảng viên không khớp TKB', space: 'Phòng học', time: 'Theo TKB', action: 'Vẫn ghi âm & phát hành, bắn cảnh báo hậu kiểm', type: 'audit', enabled: true, hits: 7 },
-  { id: 'R-006', name: 'Heatmap mật độ căng tin', group: 'Tất cả (ẩn danh)', space: 'Căng tin, sảnh lớn', time: '06:00–21:00', action: 'Thống kê mật độ, không định danh', type: 'audit', enabled: false, hits: 0 },
+  { id: 'R-001', name: 'Điểm danh lớp học theo lịch', group: 'Sinh viên lớp học phần', space: 'Phòng học (Tòa C)', time: 'Theo lịch học, ±15 phút', action: 'Ghi có mặt / đi muộn, tính đủ từ 80% thời lượng', type: 'audit', enabled: true, hits: 18420 },
+  { id: 'R-002', name: 'Kích hoạt ghi hình bài giảng', group: 'Giảng viên phụ trách môn', space: 'Phòng học có đầu ghi', time: 'Theo lịch học', action: 'Bật/tắt ghi hình, đánh dấu giờ bắt đầu và kết thúc', type: 'audit', enabled: true, hits: 612 },
+  { id: 'R-003', name: 'Cảnh báo danh sách cấm tại cổng', group: 'Danh sách cấm', space: 'Cổng & sảnh', time: '24/7', action: 'Còi tại chỗ + báo an ninh (≤2s)', type: 'realtime', enabled: true, hits: 3 },
+  { id: 'R-004', name: 'Xâm nhập khu vực hạn chế', group: 'Không có quyền', space: 'Phòng Server A501', time: '24/7', action: 'Còi tại chỗ + báo an ninh (≤2s)', type: 'realtime', enabled: true, hits: 1 },
+  { id: 'R-005', name: 'Dạy thay / đổi lịch chưa xin phép', group: 'Giảng viên không khớp lịch', space: 'Phòng học', time: 'Theo lịch học', action: 'Vẫn ghi âm và phát hành, gửi cảnh báo để hậu kiểm', type: 'audit', enabled: true, hits: 7 },
+  { id: 'R-006', name: 'Thống kê mật độ căng tin', group: 'Tất cả (ẩn danh)', space: 'Căng tin, sảnh lớn', time: '06:00–21:00', action: 'Thống kê mật độ, không định danh', type: 'audit', enabled: false, hits: 0 },
 ];
 
 export const SCHEDULE = [
@@ -105,8 +105,8 @@ export const SCHEDULE = [
 ];
 
 export const SOC_EVENTS = [
-  { id: 'EV-99121', level: 'critical', title: 'Người lạ trong Restricted Zone', place: 'A501 — Phòng Server', cam: 'CAM_A501_01', time: '16:32:08', latency: '1.4s', state: 'open' },
-  { id: 'EV-99117', level: 'critical', title: 'Khớp Blacklist tại cổng', place: 'Cổng chính — Sảnh A', cam: 'CAM_A101_01', time: '15:58:41', latency: '1.8s', state: 'ack' },
+  { id: 'EV-99121', level: 'critical', title: 'Người lạ trong khu vực hạn chế', place: 'A501 — Phòng Server', cam: 'CAM_A501_01', time: '16:32:08', latency: '1.4s', state: 'open' },
+  { id: 'EV-99117', level: 'critical', title: 'Trùng danh sách cấm tại cổng', place: 'Cổng chính — Sảnh A', cam: 'CAM_A101_01', time: '15:58:41', latency: '1.8s', state: 'ack' },
   { id: 'EV-99102', level: 'warning', title: 'Dạy thay chưa xin phép', place: 'C302 — Tiết 4-6', cam: 'CAM_C302_01', time: '09:41:12', latency: '—', state: 'open' },
   { id: 'EV-99098', level: 'info', title: 'Khiếu nại điểm danh', place: 'C301 — SV-2024-1102', cam: 'CAM_C301_01', time: '09:30:55', latency: '—', state: 'open' },
   { id: 'EV-99090', level: 'warning', title: 'Camera mất kết nối', place: 'A101 — Sảnh chính', cam: 'CAM_A101_01', time: '08:12:03', latency: '—', state: 'ack' },
@@ -114,10 +114,10 @@ export const SOC_EVENTS = [
 
 export const INITIAL_AUDIT = [
   { t: '24/10/2025 16:35:02', actor: 'Lê Hoàng Minh', action: 'Mở xem chi tiết hồ sơ', target: 'SV-2024-1102', kind: 'view' },
-  { t: '24/10/2025 16:32:09', actor: 'Policy Engine', action: 'Kích hoạt R-004 (Restricted Zone)', target: 'EV-99121', kind: 'alert' },
+  { t: '24/10/2025 16:32:09', actor: 'Hệ thống quy tắc', action: 'Kích hoạt R-004 (khu vực hạn chế)', target: 'EV-99121', kind: 'alert' },
   { t: '24/10/2025 14:32:40', actor: 'KIOSK_03', action: 'Tải lên gói dữ liệu nhận diện đa góc', target: 'SV-2024-1102', kind: 'system' },
   { t: '24/10/2025 14:30:11', actor: 'IAM', action: 'Xác thực chip CCCD thành công', target: 'SV-2024-1102', kind: 'system' },
-  { t: '24/10/2025 14:21:03', actor: 'AI-ENGINE v4.1', action: 'Confidence 94.2%, yaw 22°', target: 'YC-2025-0842', kind: 'ai' },
+  { t: '24/10/2025 14:21:03', actor: 'AI-ENGINE v4.1', action: 'Độ chắc chắn 94.2%, nghiêng đầu 22°', target: 'YC-2025-0842', kind: 'ai' },
   { t: '24/10/2025 14:20:45', actor: 'App MyDaiNam', action: 'Tạo yêu cầu chụp lại', target: 'YC-2025-0842', kind: 'system' },
 ];
 
@@ -127,7 +127,7 @@ export const CONSENTS = [
   { id: 'SV-2023-4509', name: 'Hoàng Đỗ Gia Hân', purpose: 'Điểm danh, ra vào', signed: '02/09/2023', channel: 'App MyDaiNam (OTP)', state: 'withdrawing' },
   { id: 'GV-2018-042', name: 'TS. Trần Thị Thu Thảo', purpose: 'Ra vào phòng LAB, ghi hình bài giảng', signed: '10/01/2024', channel: 'Nhập tại quầy', state: 'active' },
   { id: 'EXT-2024-008', name: 'Đoàn Văn Hùng', purpose: 'Ra vào khu căng tin', signed: '01/03/2024', channel: 'Nhập tại quầy', state: 'expired' },
-  { id: 'SV-2024-9912', name: 'Hoàng Đỗ Gia Hân (K24)', purpose: '—', signed: '—', channel: '—', state: 'none' },
+  { id: 'SV-2024-9912', name: 'Trương Gia Huy', purpose: '—', signed: '—', channel: '—', state: 'none' },
 ];
 
 export const RECORDING_META = {

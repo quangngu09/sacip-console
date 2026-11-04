@@ -13,7 +13,7 @@ const tone = {
   'status-active': 'bg-status-active/10 text-status-active',
   'status-pending': 'bg-status-pending/10 text-status-pending',
   'status-rejected': 'bg-status-rejected/10 text-status-rejected',
-  'status-inactive': 'bg-status-inactive/20 text-text-secondary',
+  'status-inactive': 'bg-surface-container text-text-secondary',
   ai: 'bg-ai-surface text-ai-border',
   primary: 'bg-primary-fixed text-on-primary-fixed-variant',
   neutral: 'bg-surface-container text-text-primary',
@@ -294,7 +294,7 @@ export function Toasts() {
   const ic = { success: 'check_circle', warn: 'warning', error: 'error', info: 'info' };
   const col = { success: 'text-status-active', warn: 'text-status-pending', error: 'text-status-rejected', info: 'text-primary-container' };
   return (
-    <div className="fixed bottom-5 right-5 z-[80] flex flex-col gap-2 w-[360px]">
+    <div className="fixed bottom-5 left-[256px] z-[80] flex flex-col gap-2 w-[360px]">
       {toasts.map((t) => (
         <div key={t.id} className="bg-surface border border-border-subtle rounded-lg shadow-lg p-3 flex gap-2.5 anim-fade" role="status">
           <Icon name={ic[t.tone]} size={20} className={col[t.tone]} />

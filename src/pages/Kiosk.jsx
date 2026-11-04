@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ConfirmReason, FaceThumb, Icon, Modal, Select } from '../components/ui';
 import { useApp } from '../store';
 import { useCameras, grabFrame } from '../hooks/useCameras';
+import logo from '../assets/logo-dnu.svg';
 
 const QUEUE = [
   { no: '01', name: 'Trần Hoàng Minh', id: '2024-7890', unit: 'Khoa CNTT (K69A)', state: 'Đã có mặt', tone: 'bg-status-active/10 text-status-active' },
@@ -160,6 +161,7 @@ export default function Kiosk() {
     <div className="min-h-screen flex flex-col bg-background select-none" style={{ minWidth: 1280 }}>
       <header className="sticky top-0 z-40 h-14 px-6 bg-rail flex items-center justify-between gap-6 text-white">
         <div className="flex items-center gap-4 min-w-0">
+          <div className="h-10 px-2 rounded bg-surface flex items-center shrink-0"><img src={logo} alt="Trường Đại học Đại Nam" className="h-8 w-auto" /></div>
           <div>
             <div className="text-body-md font-semibold leading-tight">Trạm chụp số 03</div>
             <div className="text-caption text-rail-muted">DNU Capture Studio</div>
@@ -179,7 +181,7 @@ export default function Kiosk() {
       <main className="flex-1 w-full max-w-[1880px] mx-auto px-6 py-4">
         <div className="flex items-center justify-between gap-6 mb-4">
           <div className="min-w-0">
-            <h1 className="text-k-headline-md truncate">{student ? `Đang phục vụ: ${student.name}` : liveCount ? 'Trạm sẵn sàng tiếp nhận' : cams.error ? 'Trạm chưa có camera' : 'Đang kiểm tra camera…'}</h1>
+            <h1 className="text-k-headline-lg truncate">{student ? `Đang phục vụ: ${student.name}` : liveCount ? 'Trạm sẵn sàng tiếp nhận' : cams.error ? 'Trạm chưa có camera' : 'Đang kiểm tra camera…'}</h1>
             <p className="text-caption text-text-secondary">Đồng bộ dữ liệu sinh viên K69 • Chuẩn ICAO 9303 • Liveness v3.2</p>
           </div>
           <Stepper current={STEP_OF[phase]} />
@@ -195,7 +197,7 @@ export default function Kiosk() {
           <div className="grid grid-cols-12 gap-4 items-start">
             <div className="col-span-7 flex flex-col gap-4">
               <section className="card p-6">
-                <h2 className="text-k-headline-lg">Đặt CCCD hoặc quét mã để bắt đầu</h2>
+                <h2 className="text-k-headline-md">Đặt CCCD hoặc quét mã để bắt đầu</h2>
                 <p className="text-k-body text-text-secondary mt-1">Áp thẻ chip vào khe đọc bên phải bàn máy. Trạm tự kích hoạt khi phát hiện thẻ.</p>
                 <div className="grid grid-cols-[3fr_2fr] gap-3 mt-5">
                   <button onClick={scan} className={`${actionBtn(true)} !h-16 !text-k-title-md`}><Icon name="contactless" size={24} />Quét thẻ<Kbd onDark>Space</Kbd></button>

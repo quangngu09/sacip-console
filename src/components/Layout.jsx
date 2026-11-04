@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Icon, Select } from './ui';
 import { useApp } from '../store';
 import { CURRENT_USER, TENANTS, ORG_UNITS, SUBJECT_TYPES } from '../data/mock';
+import logo from '../assets/logo-dnu.svg';
 
 const NAV = [
   { group: 'Vận hành', items: [
@@ -29,9 +30,10 @@ function Sidebar() {
   const pending = requests.filter((r) => r.status === 'pending').length;
   return (
     <aside className="fixed left-0 top-0 h-full w-[240px] bg-rail z-40 flex flex-col">
-      <div className="h-14 px-space-md flex flex-col justify-center border-b border-rail-line">
-        <div className="text-body-md font-semibold leading-tight text-white">SACIP Console</div>
-        <div className="text-caption text-rail-muted truncate">Đại học Đại Nam</div>
+      <div className="h-14 px-3 bg-surface flex items-center gap-2.5 border-b border-border-subtle">
+        <img src={logo} alt="Trường Đại học Đại Nam" className="h-8 w-auto" />
+        <span className="w-px h-7 bg-border-strong" />
+        <div className="text-label-sm font-semibold leading-tight text-primary-container">SACIP<br /><span className="font-normal text-text-secondary">Console</span></div>
       </div>
       <nav className="flex-1 px-space-sm overflow-y-auto py-2">
         {NAV.map((g) => (

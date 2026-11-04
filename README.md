@@ -33,6 +33,7 @@ Build: `npm run build` (thư mục `dist/`), hoặc `npm run build:single` để
 
 ## Hệ thống giao diện
 - Màu: xanh `#01358F` là màu chủ đạo; cam `#F57301` chỉ làm điểm nhấn, không dùng làm chữ trên nền sáng và không đặt chữ trắng lên trên (2.86:1, không đạt WCAG AA). Khi cần chữ màu cam dùng `accent-strong` `#B85200`.
+- Logo: `src/assets/logo-dnu.svg` (bản đầy đủ) và `logo-dnu-mark.svg` (favicon). Không đổi màu logo; trên nền xanh phải đặt trên nền trắng vì dòng "UNIVERSITY" màu xanh sẽ không đọc được.
 - Màu trạng thái chỉ dùng cho trạng thái, luôn kèm chữ hoặc icon. Cảnh báo dùng vàng hổ phách để không lẫn với cam thương hiệu.
 - Chữ: nội dung và bảng 14px, chú thích tối thiểu 12px, tiêu đề khối 16px, tiêu đề trang 24px.
 - Điều khiển: `btn-sm` 32px, `btn` và ô nhập 40px, `btn-lg` 48px; Kiosk 56px. Bo góc 4px cho điều khiển, 8px cho khối.
