@@ -30,20 +30,20 @@ export const STATUS_META = {
 export const REQUESTS = [
   {
     id: 'YC-2025-0842', kind: 'rescan', kindLabel: 'Chụp lại tại Kiosk', status: 'pending', priority: 'Cao', sla: 'Còn 03h 45m', slaUrgent: false,
-    name: 'Lê Minh Khôi', initials: 'MK', subjectId: 'SV-2024-1102', unit: 'Khoa Kinh tế & QTKD', cls: 'K66-QTKD-A', time: '2 giờ trước', created: '14:20 24/10/2025',
-    note: 'Em đi chụp ảnh tại Kiosk số 03 vào sáng nay nhưng hệ thống báo ảnh chói trán (specular glare) và góc chụp lệch 22 độ nên camera nhận diện thư viện và cửa phòng thi không khớp. Kính đề nghị Phòng Đào tạo mở lại quyền để em chụp lại tại trạm Kiosk.',
+    name: 'Lê Minh Khôi', initials: 'MK', subjectId: 'SV-2024-1102', unit: 'Khoa Kinh tế & QTKD', cls: 'K66-QTKD-A', time: '2 giờ trước', created: '24/10/2025 14:20',
+    note: 'Em đi chụp ảnh tại Kiosk số 03 vào sáng nay nhưng hệ thống báo ảnh chói trán và góc chụp lệch 22 độ nên camera nhận diện thư viện và cửa phòng thi không khớp. Kính đề nghị Phòng Đào tạo mở lại quyền để em chụp lại tại trạm Kiosk.',
     ai: { quality: 64, match: 94.2, liveness: 99.4, confidence: 98.6, verdict: 'Hồ sơ gặp lỗi ngoại cảnh khi chụp tại Kiosk số 03 (đèn trần phản quang trên trán, nghiêng đầu 22°). Khuyến nghị CHẤP THUẬN cấp quyền chụp lại tại Kiosk 01 hoặc 02. Quyết định cuối cùng thuộc về cán bộ Phòng Đào tạo.' },
     footer: 'Bước 3/4 • Phòng Đào tạo', step: 3,
   },
-  { id: 'YC-2025-0841', kind: 'new', kindLabel: 'Đăng ký mới', status: 'pending', priority: 'Thường', sla: 'Còn 18h 20m', name: 'TS. Trần Thị Thu Thảo', initials: 'TT', subjectId: 'GV-2018-042', unit: 'Viện Đào tạo Quốc tế', time: '3 giờ trước', created: '13:05 24/10/2025', note: 'Đăng ký truy cập giảng đường thông minh & Phòng LAB thực nghiệm 402.', footer: 'Chờ Thư ký Viện duyệt', step: 2, ai: { quality: 95, match: 99.1, liveness: 99.8, confidence: 97.2, verdict: 'Ảnh đạt chuẩn ICAO, khớp CCCD gắn chip 99.1%. Không phát hiện bất thường.' } },
-  { id: 'YC-2025-0839', kind: 'revoke', kindLabel: 'Khóa / Thu hồi', status: 'pending', priority: 'Khẩn cấp', sla: 'Còn 01h 15m', slaUrgent: true, name: 'Đoàn Văn Hùng', initials: 'ĐH', subjectId: 'EXT-2024-008', unit: 'Đơn vị Căn-tin', time: '4 giờ trước', created: '12:30 24/10/2025', note: 'Yêu cầu thu hồi toàn bộ quyền quét Face ID cổng KTX & Tòa nhà thí nghiệm do kết thúc hợp đồng và có cảnh báo ảnh in.', footer: 'Bước 2/3 • Cần xác nhận 2 người', step: 2, twoPerson: true, ai: { quality: 48, match: 71.3, liveness: 42.0, confidence: 88.0, verdict: 'Phát hiện dấu hiệu tấn công trình diễn (ảnh in). AI chỉ gợi ý — việc thu hồi cần 2 cán bộ xác nhận.' } },
-  { id: 'YC-2025-0836', kind: 'consent', kindLabel: 'Rút đồng ý (NĐ 13)', status: 'pending', priority: 'Bình thường', sla: 'Còn 22h 10m', name: 'Hoàng Đỗ Gia Hân', initials: 'GH', subjectId: 'SV-2023-4509', unit: 'Khoa Luật Quốc tế', time: '5 giờ trước', created: '14:15 hôm nay', note: 'Em thực hiện quyền rút lại sự đồng ý cho phép Nhà trường lưu trữ và nhận diện vector khuôn mặt theo Nghị định 13/2023/NĐ-CP. Em đề nghị được cấp thẻ sinh viên RFID để điểm danh và ra vào giảng đường.', footer: 'Bước 3/4 • Xóa vector', step: 3 },
-  { id: 'YC-2025-0830', kind: 'extend', kindLabel: 'Gia hạn quyền', status: 'pending', priority: 'Thấp', sla: 'Còn 36h', name: 'Vũ Thị Mai Anh', initials: 'MA', subjectId: 'NV-2022-019', unit: 'Phòng Hành chính - QT', time: 'Hôm qua', created: '09:10 23/10/2025', note: 'Đề nghị gia hạn quyền truy cập khu hành chính đến hết năm 2026. Đã có văn bản đính kèm.', footer: 'Chờ duyệt trưởng đơn vị', step: 2, ai: { quality: 89, match: 96.0, liveness: 99.0, confidence: 93.0, verdict: 'Hồ sơ hợp lệ, văn bản đính kèm đầy đủ.' } },
-  { id: 'YC-2025-0821', kind: 'new', kindLabel: 'Đăng ký mới', status: 'approved', priority: 'Thường', sla: 'Đã xử lý', name: 'Trịnh Bảo Ngọc', initials: 'BN', subjectId: 'SV-2023-5521', unit: 'Khoa CNTT', time: '2 ngày trước', created: '08:00 22/10/2025', note: 'Đăng ký Face ID điểm danh lớp học.', footer: 'Hoàn tất', step: 4, ai: { quality: 93, match: 98.0, liveness: 99.5, confidence: 96.0, verdict: 'Đạt chuẩn.' } },
+  { id: 'YC-2025-0841', kind: 'new', kindLabel: 'Đăng ký mới', status: 'pending', priority: 'Thường', sla: 'Còn 18h 20m', name: 'TS. Trần Thị Thu Thảo', initials: 'TT', subjectId: 'GV-2018-042', unit: 'Viện Đào tạo Quốc tế', time: '3 giờ trước', created: '24/10/2025 13:05', note: 'Đăng ký truy cập giảng đường thông minh & Phòng LAB thực nghiệm 402.', footer: 'Chờ Thư ký Viện duyệt', step: 2, ai: { quality: 95, match: 99.1, liveness: 99.8, confidence: 97.2, verdict: 'Ảnh đạt chuẩn ICAO, khớp CCCD gắn chip 99,1%. Không phát hiện bất thường.' } },
+  { id: 'YC-2025-0839', kind: 'revoke', kindLabel: 'Khóa / Thu hồi', status: 'pending', priority: 'Khẩn cấp', sla: 'Còn 01h 15m', slaUrgent: true, name: 'Đoàn Văn Hùng', initials: 'ĐH', subjectId: 'EXT-2024-008', unit: 'Đơn vị Căn-tin', time: '4 giờ trước', created: '24/10/2025 12:30', note: 'Yêu cầu thu hồi toàn bộ quyền quét Face ID cổng KTX & Tòa nhà thí nghiệm do kết thúc hợp đồng và có cảnh báo ảnh in.', footer: 'Bước 2/3 • Cần xác nhận 2 người', step: 2, twoPerson: true, ai: { quality: 48, match: 71.3, liveness: 42.0, confidence: 88.0, verdict: 'Phát hiện dấu hiệu tấn công trình diễn (ảnh in). AI chỉ gợi ý — việc thu hồi cần 2 cán bộ xác nhận.' } },
+  { id: 'YC-2025-0836', kind: 'consent', kindLabel: 'Rút đồng ý (NĐ 13)', status: 'pending', priority: 'Bình thường', sla: 'Còn 22h 10m', name: 'Hoàng Đỗ Gia Hân', initials: 'GH', subjectId: 'SV-2023-4509', unit: 'Khoa Luật Quốc tế', time: '5 giờ trước', created: '24/10/2025 14:15', note: 'Em thực hiện quyền rút lại sự đồng ý cho phép Nhà trường lưu trữ và nhận diện vector khuôn mặt theo Nghị định 13/2023/NĐ-CP. Em đề nghị được cấp thẻ sinh viên RFID để điểm danh và ra vào giảng đường.', footer: 'Bước 3/4 • Xóa vector', step: 3 },
+  { id: 'YC-2025-0830', kind: 'extend', kindLabel: 'Gia hạn quyền', status: 'pending', priority: 'Thấp', sla: 'Còn 36h', name: 'Vũ Thị Mai Anh', initials: 'MA', subjectId: 'NV-2022-019', unit: 'Phòng Hành chính - QT', time: 'Hôm qua', created: '23/10/2025 09:10', note: 'Đề nghị gia hạn quyền truy cập khu hành chính đến hết năm 2026. Đã có văn bản đính kèm.', footer: 'Chờ duyệt trưởng đơn vị', step: 2, ai: { quality: 89, match: 96.0, liveness: 99.0, confidence: 93.0, verdict: 'Hồ sơ hợp lệ, văn bản đính kèm đầy đủ.' } },
+  { id: 'YC-2025-0821', kind: 'new', kindLabel: 'Đăng ký mới', status: 'approved', priority: 'Thường', sla: 'Đã xử lý', name: 'Trịnh Bảo Ngọc', initials: 'BN', subjectId: 'SV-2023-5521', unit: 'Khoa CNTT', time: '2 ngày trước', created: '22/10/2025 08:00', note: 'Đăng ký Face ID điểm danh lớp học.', footer: 'Hoàn tất', step: 4, ai: { quality: 93, match: 98.0, liveness: 99.5, confidence: 96.0, verdict: 'Đạt chuẩn.' } },
 ];
 
 export const NOTIFICATIONS = [
-  { id: 1, color: 'status-rejected', title: 'Rút đồng ý Face ID (NĐ 13)', time: '5 phút trước', body: 'Sinh viên Hoàng Đỗ Gia Hân (SV-2023-4509) gửi yêu cầu thu hồi template khuôn mặt.', unread: true },
+  { id: 1, color: 'status-rejected', title: 'Rút đồng ý Face ID (NĐ 13)', time: '5 phút trước', body: 'Sinh viên Hoàng Đỗ Gia Hân (SV-2023-4509) gửi yêu cầu thu hồi dữ liệu khuôn mặt.', unread: true },
   { id: 2, color: 'status-pending', title: 'Yêu cầu sắp quá hạn', time: '18 phút trước', body: 'YC-2025-0839 (Khóa / Thu hồi) còn 01h 15m để xử lý.', unread: true },
   { id: 3, color: 'status-rejected', title: 'Cảnh báo an ninh: khu vực hạn chế', time: '25 phút trước', body: 'Đối tượng lạ xuất hiện tại Phòng Server tầng 5 nhà A. Đã kích hoạt còi tại chỗ.', unread: true, alert: true },
   { id: 4, color: 'transparent', title: 'Kiosk 01 đồng bộ thành công', time: '1 giờ trước', body: 'Danh sách thu hồi quyền đã nạp vào Kiosk Nhà A.', unread: false },
@@ -105,8 +105,8 @@ export const SCHEDULE = [
 ];
 
 export const SOC_EVENTS = [
-  { id: 'EV-99121', level: 'critical', title: 'Người lạ trong khu vực hạn chế', place: 'A501 — Phòng Server', cam: 'CAM_A501_01', time: '16:32:08', latency: '1.4s', state: 'open' },
-  { id: 'EV-99117', level: 'critical', title: 'Trùng danh sách cấm tại cổng', place: 'Cổng chính — Sảnh A', cam: 'CAM_A101_01', time: '15:58:41', latency: '1.8s', state: 'ack' },
+  { id: 'EV-99121', level: 'critical', title: 'Người lạ trong khu vực hạn chế', place: 'A501 — Phòng Server', cam: 'CAM_A501_01', time: '16:32:08', latency: '1,4 giây', state: 'open' },
+  { id: 'EV-99117', level: 'critical', title: 'Trùng danh sách cấm tại cổng', place: 'Cổng chính — Sảnh A', cam: 'CAM_A101_01', time: '15:58:41', latency: '1,8 giây', state: 'ack' },
   { id: 'EV-99102', level: 'warning', title: 'Dạy thay chưa xin phép', place: 'C302 — Tiết 4-6', cam: 'CAM_C302_01', time: '09:41:12', latency: '—', state: 'open' },
   { id: 'EV-99098', level: 'info', title: 'Khiếu nại điểm danh', place: 'C301 — SV-2024-1102', cam: 'CAM_C301_01', time: '09:30:55', latency: '—', state: 'open' },
   { id: 'EV-99090', level: 'warning', title: 'Camera mất kết nối', place: 'A101 — Sảnh chính', cam: 'CAM_A101_01', time: '08:12:03', latency: '—', state: 'ack' },
@@ -117,7 +117,7 @@ export const INITIAL_AUDIT = [
   { t: '24/10/2025 16:32:09', actor: 'Hệ thống quy tắc', action: 'Kích hoạt R-004 (khu vực hạn chế)', target: 'EV-99121', kind: 'alert' },
   { t: '24/10/2025 14:32:40', actor: 'KIOSK_03', action: 'Tải lên gói dữ liệu nhận diện đa góc', target: 'SV-2024-1102', kind: 'system' },
   { t: '24/10/2025 14:30:11', actor: 'IAM', action: 'Xác thực chip CCCD thành công', target: 'SV-2024-1102', kind: 'system' },
-  { t: '24/10/2025 14:21:03', actor: 'AI-ENGINE v4.1', action: 'Độ chắc chắn 94.2%, nghiêng đầu 22°', target: 'YC-2025-0842', kind: 'ai' },
+  { t: '24/10/2025 14:21:03', actor: 'AI-ENGINE v4.1', action: 'Độ chắc chắn 94,2%, nghiêng đầu 22°', target: 'YC-2025-0842', kind: 'ai' },
   { t: '24/10/2025 14:20:45', actor: 'App MyDaiNam', action: 'Tạo yêu cầu chụp lại', target: 'YC-2025-0842', kind: 'system' },
 ];
 
@@ -129,6 +129,16 @@ export const CONSENTS = [
   { id: 'EXT-2024-008', name: 'Đoàn Văn Hùng', purpose: 'Ra vào khu căng tin', signed: '01/03/2024', channel: 'Nhập tại quầy', state: 'expired' },
   { id: 'SV-2024-9912', name: 'Trương Gia Huy', purpose: '—', signed: '—', channel: '—', state: 'none' },
 ];
+
+// Số liệu tổng quan mẫu theo từng đơn vị trong phạm vi.
+export const UNIT_STATS = {
+  'Tất cả Khoa / Phòng ban': { collected: 23430, total: 24850, rate: 95.2, present: 11842, late: 412 },
+  'Khoa Công nghệ Thông tin': { collected: 6120, total: 6400, rate: 96.1, present: 3120, late: 88 },
+  'Khoa Kinh tế & QTKD': { collected: 4900, total: 5200, rate: 94.8, present: 2510, late: 96 },
+  'Khoa Điện - Điện tử': { collected: 2890, total: 3100, rate: 93.5, present: 1480, late: 71 },
+  'Phòng Đào tạo': { collected: 176, total: 180, rate: 98.2, present: 120, late: 2 },
+  'Ban Quản lý KTX': { collected: 1130, total: 1200, rate: 94.7, present: 612, late: 20 },
+};
 
 export const RECORDING_META = {
   done: ['status-active', 'Đã ghi xong'],

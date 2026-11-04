@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Banner, Icon, Chip, Empty, PageHeader, SearchInput, Select, Tabs } from '../components/ui';
+import { Banner, DataBoundary, Icon, Chip, Empty, PageHeader, SearchInput, Select, SortTh, Tabs, useSort } from '../components/ui';
 import { useApp } from '../store';
 import { RECORDING_META as rec, SCHEDULE } from '../data/mock';
+import { useScope } from '../lib/scope';
 
+const SORTERS = { slot: (s) => s.slot, room: (s) => s.room, course: (s) => s.course, lecturer: (s) => s.lecturer, present: (s) => s.present, late: (s) => s.late, absent: (s) => s.absent };
 const SAMPLE_DATE = '2025-10-24';
 const VIEWS = [{ key: 'schedule', label: 'Lịch học' }, { key: 'attendance', label: 'Luồng điểm danh' }, { key: 'media', label: 'Xử lý bài giảng' }];
 
@@ -15,7 +17,7 @@ const ATTENDANCE_STEPS = [
   ['Nhận diện giảng viên và bật ghi hình', 'Tự bắt đầu, dừng ghi hình và đánh dấu giờ'],
 ];
 const MEDIA_STEPS = [
-  ['Tải video từ đầu ghi', 'NVR_C_01 • 2.4 GB', 100],
+  ['Tải video từ đầu ghi', 'NVR_C_01 • 2,4 GB', 100],
   ['Tách âm thanh', '142 phút • 48kHz', 100],
   ['Lọc tiếng ồn', 'Tiếng quạt, điều hòa, ồn lớp', 100],
   ['Tạo phụ đề và lưu trữ', 'Đang chuyển giọng nói thành văn bản', 64],
@@ -23,14 +25,18 @@ const MEDIA_STEPS = [
 
 export default function Schedule() {
   const { toast, log } = useApp();
+  const { allUnits, matchUnit } = useScope();
   const [view, setView] = useState('schedule');
   const [date, setDate] = useState(SAMPLE_DATE);
   const [room, setRoom] = useState('all');
   const [q, setQ] = useState('');
   const rooms = [{ value: 'all', label: 'Tất cả phòng' }, ...[...new Set(SCHEDULE.map((s) => s.room))].map((r) => ({ value: r, label: `Phòng ${r}` }))];
   const rows = (date === SAMPLE_DATE ? SCHEDULE : [])
+    .filter((s) => matchUnit(s.cls))
     .filter((s) => room === 'all' || s.room === room)
     .filter((s) => !q || `${s.course} ${s.cls} ${s.lecturer}`.toLowerCase().includes(q.toLowerCase()));
+
+  const table = useSort(rows, SORTERS);
 
   return (
     <div>
@@ -38,6 +44,7 @@ export default function Schedule() {
         badge={<Chip color="status-active" icon="sync">Đồng bộ 2 phút trước</Chip>}
         actions={<button className="btn-outline" onClick={() => { log('Đồng bộ thủ công lịch học', 'Hệ thống đào tạo'); toast('Đã đồng bộ lịch học', '128 tiết học hôm nay, 3 lịch đổi phòng.', 'success'); }}><Icon name="sync" />Đồng bộ ngay</button>} />
 
+      <DataBoundary name="schedule" label="lịch học" scopeNote="units">
       <div className="card overflow-hidden">
         <Tabs label="Nội dung" className="px-2 border-b border-border-subtle" value={view} onChange={setView} items={VIEWS} />
 
@@ -50,9 +57,9 @@ export default function Schedule() {
             </div>
             <div className="overflow-x-auto">
               <table className="data-table">
-                <thead><tr>{['Khung giờ', 'Phòng', 'Học phần và lớp', 'Giảng viên', 'Có mặt', 'Đi muộn', 'Vắng', 'Ghi hình bài giảng', 'Thao tác'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+                <thead><tr><SortTh k="slot" table={table}>Khung giờ</SortTh><SortTh k="room" table={table}>Phòng</SortTh><SortTh k="course" table={table}>Học phần và lớp</SortTh><SortTh k="lecturer" table={table}>Giảng viên</SortTh><SortTh k="present" table={table}>Có mặt</SortTh><SortTh k="late" table={table}>Đi muộn</SortTh><SortTh k="absent" table={table}>Vắng</SortTh><th>Ghi hình bài giảng</th><th>Thao tác</th></tr></thead>
                 <tbody>
-                  {rows.map((s) => (
+                  {table.sorted.map((s) => (
                     <tr key={`${s.slot}-${s.room}`} className="h-14 hover:bg-surface-container-low">
                       <td className="whitespace-nowrap">{s.slot}</td>
                       <td className="font-mono font-medium">{s.room}</td>
@@ -69,7 +76,7 @@ export default function Schedule() {
                   ))}
                 </tbody>
               </table>
-              {rows.length === 0 && <Empty icon="event_busy" title="Không có tiết học phù hợp" desc={date === SAMPLE_DATE ? 'Thử bỏ bớt bộ lọc.' : 'Dữ liệu mẫu chỉ có lịch của ngày 24/10/2025.'} />}
+              {rows.length === 0 && <Empty icon="event_busy" title="Không có tiết học phù hợp" desc={date !== SAMPLE_DATE ? 'Dữ liệu mẫu chỉ có lịch của ngày 24/10/2025.' : allUnits ? 'Thử bỏ bớt bộ lọc.' : 'Đơn vị đang chọn không có tiết học trong ngày này.'} />}
             </div>
           </>
         )}
@@ -99,6 +106,7 @@ export default function Schedule() {
           </div>
         )}
       </div>
+      </DataBoundary>
     </div>
   );
 }

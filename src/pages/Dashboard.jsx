@@ -1,8 +1,10 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Icon, Chip, MetricStrip, PageHeader } from '../components/ui';
+import { DataBoundary, Icon, Chip, MetricStrip, PageHeader } from '../components/ui';
 import { useApp } from '../store';
-import { RECORDING_META, SCHEDULE, SOC_EVENTS, DEVICES } from '../data/mock';
+import { RECORDING_META, SCHEDULE, SOC_EVENTS, DEVICES, UNIT_STATS } from '../data/mock';
+import { fmtNumber, fmtPercent } from '../lib/format';
+import { useScope } from '../lib/scope';
 
 const LEVEL = {
   critical: { label: 'Nghiêm trọng', icon: 'error', color: 'text-status-rejected' },
@@ -51,7 +53,7 @@ function AttendanceChart() {
   return (
     <div ref={ref} className="relative" onMouseLeave={() => setActive(null)}>
       {width > 0 && (
-        <svg width={width} height={H} role="group" aria-label="Tỉ lệ điểm danh 7 ngày: cao nhất 95.2% vào T7, thấp nhất 89.6% vào T6.">
+        <svg width={width} height={H} role="group" aria-label="Tỉ lệ điểm danh 7 ngày: cao nhất 95,2% vào T7, thấp nhất 89,6% vào T6.">
           {[80, 90, 100].map((t) => (
             <g key={t}>
               <line x1={pad.l} x2={width - pad.r} y1={y(t)} y2={y(t)} className="stroke-border-subtle" />
@@ -63,15 +65,15 @@ function AttendanceChart() {
           {points.map((p) => (
             <g key={p.d}>
               <circle cx={x(p.i)} cy={y(p.v)} r="4" strokeWidth="2" className="fill-primary-container stroke-surface" />
-              {LABELLED.includes(p.d) && active !== p.i && <text x={x(p.i)} y={y(p.v) + (p.d === 'T6' ? 20 : -10)} textAnchor="middle" className="fill-text-primary text-caption font-medium tabular-nums">{p.v}%</text>}
-              <rect x={x(p.i) - band / 2} y={pad.t} width={band} height={H - pad.t - pad.b} fill="transparent" role="img" tabIndex={0} aria-label={`${p.d}: ${p.v}%`} onMouseEnter={() => setActive(p.i)} onFocus={() => setActive(p.i)} onBlur={() => setActive(null)} />
+              {LABELLED.includes(p.d) && active !== p.i && <text x={x(p.i)} y={y(p.v) + (p.d === 'T6' ? 20 : -10)} textAnchor="middle" className="fill-text-primary text-caption font-medium tabular-nums">{fmtPercent(p.v)}</text>}
+              <rect x={x(p.i) - band / 2} y={pad.t} width={band} height={H - pad.t - pad.b} fill="transparent" role="img" tabIndex={0} aria-label={`${p.d}: ${fmtPercent(p.v)}`} onMouseEnter={() => setActive(p.i)} onFocus={() => setActive(p.i)} onBlur={() => setActive(null)} />
             </g>
           ))}
         </svg>
       )}
       {cur && (
         <div className="absolute pointer-events-none -translate-x-1/2 -translate-y-full px-2 py-1 rounded bg-inverse-surface text-inverse-on-surface text-caption tabular-nums whitespace-nowrap" style={{ left: x(cur.i), top: y(cur.v) - 10 }}>
-          {cur.d}: <b className="font-semibold">{cur.v}%</b>
+          {cur.d}: <b className="font-semibold">{fmtPercent(cur.v)}</b>
         </div>
       )}
     </div>
@@ -87,8 +89,11 @@ const PIPELINE = [
 ];
 
 export default function Dashboard() {
-  const { requests, scope } = useApp();
-  const pendingList = requests.filter((r) => r.status === 'pending');
+  const { requests } = useApp();
+  const { scope, allUnits, matchUnit, matchSubject } = useScope();
+  const stats = UNIT_STATS[scope.unit];
+  const pendingList = requests.filter((r) => r.status === 'pending' && matchUnit(r.unit) && matchSubject(r.subjectId));
+  const schedule = SCHEDULE.filter((s) => matchUnit(s.cls));
   const urgent = pendingList.filter((r) => r.slaUrgent);
   const offline = DEVICES.filter((d) => !d.online);
   const attention = [
@@ -99,14 +104,15 @@ export default function Dashboard() {
   ];
   return (
     <div>
-      <PageHeader title="Tổng quan hệ thống" desc={`Phạm vi: ${scope.tenant} • ${scope.unit}`}
+      <PageHeader title="Tổng quan hệ thống" desc={`Phạm vi: ${scope.tenant} • ${scope.unit} • ${scope.subject}`}
         actions={<Link to="/kiosk" className="btn-outline"><Icon name="photo_camera_front" />Mở Kiosk trạm chụp</Link>} />
 
+      <DataBoundary name="dashboard" label="số liệu tổng quan" scopeNote="units">
       <MetricStrip className="mb-space-md" items={[
-        { label: 'Hồ sơ Face ID đã thu thập', value: '23,430', sub: '94.3% / 24,850 đối tượng', to: '/ho-so' },
-        { label: 'Tỉ lệ điểm danh hôm nay', value: '95.2%', sub: 'Có mặt 11,842 • Đi muộn 412', to: '/thoi-khoa-bieu' },
+        { label: 'Hồ sơ Face ID đã thu thập', value: fmtNumber(stats.collected), sub: `${fmtPercent((stats.collected / stats.total) * 100)} trên ${fmtNumber(stats.total)} đối tượng`, to: '/ho-so' },
+        { label: 'Tỉ lệ điểm danh hôm nay', value: fmtPercent(stats.rate), sub: `Có mặt ${fmtNumber(stats.present)} • Đi muộn ${fmtNumber(stats.late)}`, to: '/thoi-khoa-bieu' },
         { label: 'Yêu cầu chờ duyệt', value: pendingList.length, sub: urgent.length ? `${urgent.length} yêu cầu sắp quá hạn` : 'Tất cả còn trong hạn', alert: urgent.length > 0, to: '/yeu-cau' },
-        { label: 'Thiết bị trực tuyến', value: `${DEVICES.length - offline.length}/${DEVICES.length}`, sub: offline.length ? `${offline.length} thiết bị mất kết nối` : 'Tất cả trực tuyến', alert: offline.length > 0, to: '/thiet-bi' },
+        { label: 'Thiết bị trực tuyến', value: `${DEVICES.length - offline.length}/${DEVICES.length}`, sub: offline.length ? `${offline.length} mất kết nối (toàn trường)` : 'Tất cả trực tuyến', alert: offline.length > 0, to: '/thiet-bi' },
       ]} />
 
       <div className="grid grid-cols-12 gap-space-md items-start">
@@ -116,10 +122,11 @@ export default function Dashboard() {
             <Link to="/soc" className="text-label-sm text-primary-container hover:underline">Xem trang An ninh</Link>
           </div>
           <AttentionList items={attention} />
+          {!allUnits && <p className="px-space-md py-2 border-t border-border-subtle text-caption text-text-secondary">Sự kiện an ninh và thiết bị luôn hiển thị toàn trường.</p>}
         </section>
 
         <section className="col-span-5 card p-space-md">
-          <h2 className="text-headline-md mb-2">Tỉ lệ điểm danh 7 ngày</h2>
+          <h2 className="text-headline-md mb-2">Tỉ lệ điểm danh 7 ngày <span className="font-normal text-caption text-text-secondary">toàn trường</span></h2>
           <AttendanceChart />
           <p className="text-caption text-text-secondary mt-1">Trục tung bắt đầu từ 80%. Chủ nhật không có lịch học.</p>
         </section>
@@ -133,7 +140,7 @@ export default function Dashboard() {
             <table className="data-table">
               <thead><tr>{['Khung giờ', 'Phòng', 'Học phần', 'Giảng viên', 'Có mặt', 'Đi muộn', 'Vắng', 'Ghi hình bài giảng'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
               <tbody>
-                {SCHEDULE.map((s) => (
+                {schedule.map((s) => (
                   <tr key={`${s.slot}-${s.room}`}>
                     <td className="whitespace-nowrap">{s.slot}</td>
                     <td className="font-mono">{s.room}</td>
@@ -147,6 +154,7 @@ export default function Dashboard() {
                 ))}
               </tbody>
             </table>
+            {schedule.length === 0 && <p className="p-space-md text-body-sm text-text-secondary">Đơn vị này không có tiết học hôm nay.</p>}
           </div>
         </section>
 
@@ -165,6 +173,7 @@ export default function Dashboard() {
           </ol>
         </details>
       </div>
+      </DataBoundary>
     </div>
   );
 }

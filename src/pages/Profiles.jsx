@@ -1,19 +1,22 @@
 import { useMemo, useState } from 'react';
-import { Icon, Chip, StatusDot, ScoreBar, FaceThumb, Drawer, ConfirmReason, AiCard, Empty, PageHeader, SearchInput, Select, Tabs } from '../components/ui';
+import { Icon, Chip, StatusDot, ScoreBar, FaceThumb, Drawer, ConfirmReason, AiCard, DataBoundary, Empty, PageHeader, SearchInput, Select, SortTh, Tabs, useSort } from '../components/ui';
 import { useApp } from '../store';
 import { STATUS_META } from '../data/mock';
+import { fmtNumber, sortableDate } from '../lib/format';
+import { useScope } from '../lib/scope';
 
 const VIEWS = [
-  { key: 'all', label: 'Tất cả', count: '24,850', f: () => true },
-  { key: 'none', label: 'Chưa thu thập', count: '1,420', f: (p) => p.status === 'none' },
-  { key: 'pending', label: 'Chờ xác nhận', count: '342', f: (p) => p.status === 'pending', tone: 'status-pending' },
-  { key: 'quality', label: 'Lỗi chất lượng', count: '86', f: (p) => p.status === 'quality' || p.status === 'locked', tone: 'status-rejected' },
-  { key: 'expiring', label: 'Sắp hết hạn', count: '115', f: (p) => p.expiring, tone: 'status-pending' },
+  { key: 'all', label: 'Tất cả', count: 24850, f: () => true },
+  { key: 'none', label: 'Chưa thu thập', count: 1420, f: (p) => p.status === 'none' },
+  { key: 'pending', label: 'Chờ xác nhận', count: 342, f: (p) => p.status === 'pending', tone: 'status-pending' },
+  { key: 'quality', label: 'Lỗi chất lượng', count: 86, f: (p) => p.status === 'quality' || p.status === 'locked', tone: 'status-rejected' },
+  { key: 'expiring', label: 'Sắp hết hạn', count: 115, f: (p) => p.expiring, tone: 'status-pending' },
 ];
 
 const STATUS_OPTIONS = [{ value: 'all', label: 'Tất cả trạng thái' }, ...Object.entries(STATUS_META).map(([value, m]) => ({ value, label: m.label }))];
 const VALIDITY_OPTIONS = [{ value: 'all', label: 'Tất cả hiệu lực' }, { value: 'valid', label: 'Còn hiệu lực' }, { value: 'expiring', label: 'Sắp hết hạn' }, { value: 'waiting', label: 'Đang chờ xử lý' }, { value: 'off', label: 'Đã vô hiệu hóa' }, { value: 'blank', label: 'Chưa có' }];
 const RISK_OPTIONS = [{ value: 'all', label: 'Tất cả rủi ro' }, { value: 'yes', label: 'Có cờ rủi ro' }, { value: 'no', label: 'Không có cờ' }];
+const SORTERS = { name: (p) => p.name, unit: (p) => p.unit, source: (p) => p.source, status: (p) => STATUS_META[p.status].label, validity: (p) => sortableDate(p.validity), score: (p) => p.score };
 const NO_FILTERS = { status: 'all', validity: 'all', source: 'all', risk: 'all' };
 
 const matchValidity = (p, v) => ({
@@ -36,7 +39,8 @@ const BULK = [
 ];
 
 export default function Profiles() {
-  const { profiles, setProfiles, log, toast, scope } = useApp();
+  const { profiles, setProfiles, log, toast } = useApp();
+  const { scope, narrowed: scopeNarrowed, matchUnit, matchSubject } = useScope();
   const [view, setView] = useState('all');
   const [q, setQ] = useState('');
   const [filters, setFilters] = useState(NO_FILTERS);
@@ -46,20 +50,21 @@ export default function Profiles() {
 
   const sourceOptions = useMemo(() => [{ value: 'all', label: 'Tất cả nguồn' }, ...[...new Set(profiles.map((p) => p.source).filter(Boolean))].map((s) => ({ value: s, label: s })), { value: 'blank', label: 'Chưa có nguồn' }], [profiles]);
 
+  const scoped = useMemo(() => profiles.filter((p) => matchUnit(p.unit) && matchSubject(p.id)), [profiles, scope.unit, scope.subject]); // eslint-disable-line react-hooks/exhaustive-deps
   const rows = useMemo(() => {
     const v = VIEWS.find((x) => x.key === view);
-    const subj = scope.subject.startsWith('Đối tượng') ? null : scope.subject;
     const f = filters;
-    return profiles.filter(v.f)
-      .filter((p) => !subj || p.type === subj)
+    return scoped.filter(v.f)
       .filter((p) => f.status === 'all' || p.status === f.status)
       .filter((p) => matchValidity(p, f.validity))
       .filter((p) => f.source === 'all' || (f.source === 'blank' ? !p.source : p.source === f.source))
       .filter((p) => f.risk === 'all' || (f.risk === 'yes' ? !!p.risk : !p.risk))
       .filter((p) => !q || `${p.id} ${p.name} ${p.email}`.toLowerCase().includes(q.toLowerCase()));
-  }, [profiles, view, q, scope.subject, filters]);
+  }, [scoped, view, q, filters]);
+  const table = useSort(rows, SORTERS);
+  const tabs = VIEWS.map((v) => ({ ...v, count: fmtNumber(scopeNarrowed ? scoped.filter(v.f).length : v.count) }));
 
-  const narrowed = view !== 'all' || !!q || !!Object.values(filters).find((x) => x !== 'all') || !scope.subject.startsWith('Đối tượng');
+  const narrowed = view !== 'all' || !!q || !!Object.values(filters).find((x) => x !== 'all') || scopeNarrowed;
   const canReset = view !== 'all' || !!q || !!Object.values(filters).find((x) => x !== 'all');
   const reset = () => { setFilters(NO_FILTERS); setView('all'); setQ(''); };
   const setFilter = (k) => (v) => setFilters((f) => ({ ...f, [k]: v }));
@@ -88,8 +93,9 @@ export default function Profiles() {
           <button className="btn-primary" onClick={() => toast('Thêm hồ sơ', 'Hồ sơ mới được tạo từ IAM; ảnh thu nhận qua App MyDaiNam hoặc Kiosk.')}><Icon name="person_add" />Thêm hồ sơ</button>
         </>} />
 
+      <DataBoundary name="profiles" label="danh sách hồ sơ" fill>
       <div className="card flex-1 min-h-0 flex flex-col overflow-hidden">
-        <Tabs label="Nhóm hồ sơ" className="px-2 border-b border-border-subtle shrink-0" value={view} onChange={setView} items={VIEWS} />
+        <Tabs label="Nhóm hồ sơ" className="px-2 border-b border-border-subtle shrink-0" value={view} onChange={setView} items={tabs} />
 
         {selected.size > 0 ? (
           <div className="min-h-[64px] px-3 py-2 bg-primary-fixed border-b border-border-subtle flex items-center gap-2 shrink-0 anim-fade" role="region" aria-label="Thao tác hàng loạt">
@@ -113,17 +119,17 @@ export default function Profiles() {
             <thead>
               <tr>
                 <th className="sticky top-0 left-0 z-20 w-12 !px-2"><label className="w-8 h-8 flex items-center justify-center cursor-pointer"><input type="checkbox" checked={allChecked} onChange={toggleAll} className="w-4 h-4 accent-primary-container" aria-label="Chọn tất cả" /></label></th>
-                <th className="sticky top-0 left-12 z-20 min-w-[230px]">Họ tên và mã số</th>
-                <th className="sticky top-0 z-10">Đơn vị</th>
-                <th className="sticky top-0 z-10 hidden min-[1400px]:table-cell">Nguồn dữ liệu</th>
-                <th className="sticky top-0 z-10">Trạng thái</th>
-                <th className="sticky top-0 z-10">Hiệu lực</th>
-                <th className="sticky top-0 z-10">Điểm ảnh (AI)</th>
+                <SortTh k="name" table={table} className="sticky top-0 left-12 z-20 min-w-[230px]">Họ tên và mã số</SortTh>
+                <SortTh k="unit" table={table} className="sticky top-0 z-10">Đơn vị</SortTh>
+                <SortTh k="source" table={table} className="sticky top-0 z-10 hidden min-[1400px]:table-cell">Nguồn dữ liệu</SortTh>
+                <SortTh k="status" table={table} className="sticky top-0 z-10">Trạng thái</SortTh>
+                <SortTh k="validity" table={table} className="sticky top-0 z-10">Hiệu lực</SortTh>
+                <SortTh k="score" table={table} className="sticky top-0 z-10">Điểm ảnh (AI)</SortTh>
                 <th className="sticky top-0 right-0 z-20 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((p) => {
+              {table.sorted.map((p) => {
                 const st = STATUS_META[p.status];
                 const canOpen = p.status !== 'none';
                 return (
@@ -163,7 +169,7 @@ export default function Profiles() {
         </div>
 
         <div className="h-12 px-space-md border-t border-border-subtle flex items-center justify-between text-body-sm text-text-secondary shrink-0">
-          <span aria-live="polite">{narrowed ? <>Tìm thấy <b className="text-text-primary font-medium">{rows.length}</b> hồ sơ</> : <>Hiển thị <b className="text-text-primary font-medium">1–{rows.length}</b> trong tổng số <b className="text-text-primary font-medium">24,850</b> hồ sơ</>}</span>
+          <span aria-live="polite">{narrowed ? <>Tìm thấy <b className="text-text-primary font-medium">{rows.length}</b> hồ sơ</> : <>Hiển thị <b className="text-text-primary font-medium">1–{rows.length}</b> trong tổng số <b className="text-text-primary font-medium">{fmtNumber(24850)}</b> hồ sơ</>}</span>
           <div className="flex items-center gap-2">
             <span>Trang 1 / {narrowed ? 1 : 994}</span>
             <button disabled className="btn-outline btn-sm !px-1.5" aria-label="Trang trước" title="Dữ liệu mẫu chỉ có một trang"><Icon name="chevron_left" /></button>
@@ -171,6 +177,7 @@ export default function Profiles() {
           </div>
         </div>
       </div>
+      </DataBoundary>
 
       <ProfileDrawer profile={detail} onClose={() => setDetail(null)} />
       <ConfirmReason open={!!bulk} onClose={() => setBulk(null)} onConfirm={runBulk} danger={bulk?.danger}
@@ -244,8 +251,8 @@ function ProfileDrawer({ profile, onClose }) {
         <section>
           <h3 className="text-headline-md mb-2">Kết quả kiểm tra</h3>
           <dl className="grid grid-cols-2 gap-2">
-            <div className="p-2.5 rounded-lg bg-surface-bright"><dt className="text-caption text-text-secondary">Khớp với ảnh CCCD</dt><dd className="font-semibold text-status-active">94.2%</dd></div>
-            <div className="p-2.5 rounded-lg bg-surface-bright"><dt className="text-caption text-text-secondary">Kiểm tra người thật</dt><dd className={`font-semibold ${profile.risk?.includes('ảnh in') ? 'text-status-rejected' : 'text-status-active'}`}>{profile.risk?.includes('ảnh in') ? 'Không đạt (42%)' : 'Đạt (99.4%)'}</dd></div>
+            <div className="p-2.5 rounded-lg bg-surface-bright"><dt className="text-caption text-text-secondary">Khớp với ảnh CCCD</dt><dd className="font-semibold text-status-active">94,2%</dd></div>
+            <div className="p-2.5 rounded-lg bg-surface-bright"><dt className="text-caption text-text-secondary">Kiểm tra người thật</dt><dd className={`font-semibold ${profile.risk?.includes('ảnh in') ? 'text-status-rejected' : 'text-status-active'}`}>{profile.risk?.includes('ảnh in') ? 'Không đạt (42%)' : 'Đạt (99,4%)'}</dd></div>
           </dl>
           <p className="text-caption text-text-secondary mt-2">AI chỉ khuyến nghị, người duyệt quyết định.</p>
         </section>
@@ -253,7 +260,7 @@ function ProfileDrawer({ profile, onClose }) {
         <section>
           <h3 className="text-headline-md mb-2">Lịch sử phiên bản</h3>
           <ol className="flex flex-col gap-2 text-body-sm">
-            <li><div className="flex items-center gap-2"><b className="font-medium">v2.0 (hiện tại)</b><Chip color="status-pending">Chờ duyệt</Chip></div><div className="text-caption text-text-secondary">14:32 25/10/2025 • Kiosk số 03 (phiên #TR3-2025-041)</div></li>
+            <li><div className="flex items-center gap-2"><b className="font-medium">v2.0 (hiện tại)</b><Chip color="status-pending">Chờ duyệt</Chip></div><div className="text-caption text-text-secondary">25/10/2025 14:32 • Kiosk số 03 (phiên #TR3-2025-041)</div></li>
             <li><div className="text-text-secondary">v1.0 (lưu trữ)</div><div className="text-caption text-text-secondary">15/09/2023 • App MyDaiNam (đã thay thế)</div></li>
           </ol>
         </section>

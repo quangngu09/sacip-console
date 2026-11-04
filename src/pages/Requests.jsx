@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Icon, Chip, FaceThumb, Modal, ConfirmReason, AiCard, Empty, PageHeader, SearchInput, Select } from '../components/ui';
+import { Icon, Chip, DataBoundary, FaceThumb, Modal, ConfirmReason, AiCard, Empty, PageHeader, SearchInput, Select } from '../components/ui';
 import { useApp } from '../store';
 import { CURRENT_USER } from '../data/mock';
+import { fmtPercent } from '../lib/format';
+import { useScope } from '../lib/scope';
 
 const TABS = [
   ['pending', 'Chờ duyệt'], ['all', 'Tất cả'], ['approved', 'Đã duyệt'], ['rejected', 'Từ chối'], ['cancelled', 'Đã hủy'],
@@ -11,7 +13,9 @@ const prioColor = { 'Khẩn cấp': 'bg-status-rejected text-white', Cao: 'bg-st
 const FORWARD_TARGETS = ['Trưởng Phòng Đào tạo', 'Phòng Pháp chế', 'Ban Quản lý KTX'];
 
 export default function Requests() {
-  const { requests, setRequests, log, toast } = useApp();
+  const { requests: allRequests, setRequests, log, toast } = useApp();
+  const { matchUnit, matchSubject, narrowed } = useScope();
+  const requests = allRequests.filter((r) => matchUnit(r.unit) && matchSubject(r.subjectId));
   const [tab, setTab] = useState('pending');
   const [q, setQ] = useState('');
   const [sel, setSel] = useState('YC-2025-0842');
@@ -20,17 +24,19 @@ export default function Requests() {
   const [forwardOpen, setForwardOpen] = useState(false);
   const [forwardTo, setForwardTo] = useState(FORWARD_TARGETS[0]);
 
-  const counts = useMemo(() => Object.fromEntries(TABS.map(([k]) => [k, k === 'all' ? requests.length : requests.filter((r) => r.status === k).length])), [requests]);
+  const counts = Object.fromEntries(TABS.map(([k]) => [k, k === 'all' ? requests.length : requests.filter((r) => r.status === k).length]));
   const list = requests.filter((r) => tab === 'all' || r.status === tab).filter((r) => !q || `${r.id} ${r.name} ${r.subjectId}`.toLowerCase().includes(q.toLowerCase()));
-  const cur = requests.find((r) => r.id === sel);
+  // Yêu cầu đang chọn có thể bị đổi phạm vi loại ra: khi đó chọn yêu cầu đầu danh sách, không hiển thị dữ liệu ngoài phạm vi.
+  const cur = requests.find((r) => r.id === sel) || list[0];
 
   const update = (id, patch) => setRequests((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
 
   return (
     <div className="page-fill flex flex-col">
       <PageHeader title="Hộp yêu cầu" badge={counts.pending > 0 && <Chip color="status-pending">{counts.pending} việc cần làm</Chip>}
-        desc="Mọi quyết định do cán bộ ký số • Thời gian xử lý trung bình 1.8 giờ • Kiosk vừa đồng bộ" />
+        desc="Mọi quyết định do cán bộ ký số • Thời gian xử lý trung bình 1,8 giờ • Kiosk vừa đồng bộ" />
 
+      <DataBoundary name="requests" label="hộp yêu cầu" fill>
       <div className="flex-1 min-h-0 grid grid-cols-[380px_minmax(0,1fr)] gap-space-md">
         <section className="card overflow-hidden flex flex-col min-h-0" aria-label="Danh sách yêu cầu">
           <div className="p-3 border-b border-border-subtle flex gap-2 shrink-0">
@@ -38,7 +44,7 @@ export default function Requests() {
             <Select className="!w-[148px]" label="Lọc theo trạng thái" value={tab} onChange={setTab} options={TABS.map(([k, l]) => ({ value: k, label: `${l} (${counts[k]})` }))} />
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-border-subtle">
-            {list.length === 0 && <Empty title="Không có yêu cầu" desc="Hộp yêu cầu trống với bộ lọc hiện tại." />}
+            {list.length === 0 && <Empty title="Không có yêu cầu" desc={narrowed ? 'Không có yêu cầu nào trong phạm vi đang chọn.' : 'Hộp yêu cầu trống với bộ lọc hiện tại.'} />}
             {list.map((r) => {
               const active = r.id === sel;
               return (
@@ -62,12 +68,13 @@ export default function Requests() {
         </section>
 
         <section className="card overflow-hidden flex flex-col min-h-0" aria-label="Chi tiết yêu cầu">
-          {!cur ? <Empty title="Chọn một yêu cầu" /> : cur.kind === 'consent'
+          {!cur ? <Empty title="Chưa có yêu cầu để xem" desc="Chi tiết sẽ hiển thị khi có yêu cầu trong danh sách." /> : cur.kind === 'consent'
             ? <ConsentDetail r={cur} onDone={() => { update(cur.id, { status: 'approved', footer: 'Hoàn tất xóa dữ liệu' }); log('Xác nhận đã xử lý rút đồng ý (xóa ảnh + vector)', cur.subjectId); toast('Đã hoàn tất rút đồng ý', 'Ảnh gốc và dữ liệu sinh trắc đã xóa; đã gửi biên bản cho sinh viên.', 'success'); }} />
             : <ApprovalDetail r={cur} onApprove={() => setApproveOpen(true)} onReject={() => setRejectOpen(true)} onForward={() => setForwardOpen(true)}
                 onSimulateCancel={() => { update(cur.id, { status: 'cancelled' }); log('Đối tượng tự hủy yêu cầu qua App', cur.id, 'system'); toast('Yêu cầu đã bị đối tượng hủy', `${cur.id}: quyền chụp tự động thu hồi.`, 'warn'); }} />}
         </section>
       </div>
+      </DataBoundary>
 
       {cur && <ApproveModal open={approveOpen} r={cur} onClose={() => setApproveOpen(false)} onConfirm={(reason) => {
         if (cur.twoPerson && !cur.firstApproval) {
@@ -119,7 +126,7 @@ function ApprovalDetail({ r, onApprove, onReject, onForward, onSimulateCancel })
   const closed = r.status !== 'pending';
   const steps = [
     { t: 'Đối tượng gửi yêu cầu', d: `${r.name} nộp đơn qua App MyDaiNam, xác thực OTP.`, time: r.created },
-    { t: 'Cố vấn học tập / Trưởng đơn vị', d: 'ThS. Nguyễn Văn An: “Xác nhận cần cập nhật ảnh chuẩn để phục vụ điểm danh thi.”', time: '15:10 24/10/2025' },
+    { t: 'Cố vấn học tập / Trưởng đơn vị', d: 'ThS. Nguyễn Văn An: “Xác nhận cần cập nhật ảnh chuẩn để phục vụ điểm danh thi.”', time: '24/10/2025 15:10' },
     { t: `Phòng Đào tạo${r.twoPerson ? ' (2 người xác nhận)' : ''}`, d: r.firstApproval ? `Đã có xác nhận thứ nhất: ${r.firstApproval}. Chờ cán bộ thứ 2.` : `Phân công thẩm định: ${CURRENT_USER.name}.` },
     { t: 'Tự động mở quyền Kiosk và gửi mã QR', d: 'Hệ thống mở quyền tại Kiosk 01, 02, 03 và gửi mã QR vào App MyDaiNam.' },
   ];
@@ -151,7 +158,7 @@ function ApprovalDetail({ r, onApprove, onReject, onForward, onSimulateCancel })
             {revealed
               ? <button className="btn-outline btn-sm w-full" onClick={() => setRevealed(false)}>Làm mờ lại</button>
               : <button className="btn-outline btn-sm w-full !px-1" onClick={() => setRevealAsk(true)}><Icon name="visibility" size={16} />Xem rõ</button>}
-            <span className="text-caption text-text-secondary text-center">Kiosk #03<br />09:14 24/10/2025</span>
+            <span className="text-caption text-text-secondary text-center">Kiosk #03<br />24/10/2025 09:14</span>
           </div>
           <div className="flex-1 min-w-0 flex flex-col gap-3">
             <dl className="grid grid-cols-3 gap-x-4 gap-y-2 text-body-sm">
@@ -171,10 +178,10 @@ function ApprovalDetail({ r, onApprove, onReject, onForward, onSimulateCancel })
             <p className="text-body-sm mb-3">{r.ai.verdict}</p>
             <div className="grid grid-cols-3 gap-space-sm">
               <Metric label="Chất lượng ảnh chân dung" value={`${quality}/100`} good={quality >= 85} warn={quality >= 60} sub={quality >= 85 ? 'Đạt chuẩn ICAO' : 'Chưa đạt: chói trán 38%, nghiêng đầu 22°'} />
-              <Metric label="Khớp với ảnh CCCD" value={`${r.ai.match}%`} good={r.ai.match >= 90} sub={r.ai.match >= 90 ? 'Không phát hiện mạo danh' : 'Độ khớp thấp'} />
-              <Metric label="Kiểm tra người thật" value={r.ai.liveness >= 90 ? 'Đạt' : 'Không đạt'} good={r.ai.liveness >= 90} sub={`Xác suất người thật ${r.ai.liveness}%`} />
+              <Metric label="Khớp với ảnh CCCD" value={fmtPercent(r.ai.match)} good={r.ai.match >= 90} sub={r.ai.match >= 90 ? 'Không phát hiện mạo danh' : 'Độ khớp thấp'} />
+              <Metric label="Kiểm tra người thật" value={r.ai.liveness >= 90 ? 'Đạt' : 'Không đạt'} good={r.ai.liveness >= 90} sub={`Xác suất người thật ${fmtPercent(r.ai.liveness)}`} />
             </div>
-            <p className="text-caption text-text-secondary mt-2">AI chắc chắn {r.ai.confidence}% về nhận định trên. Con số này không phải điểm chất lượng ảnh.</p>
+            <p className="text-caption text-text-secondary mt-2">AI chắc chắn {fmtPercent(r.ai.confidence)} về nhận định trên. Con số này không phải điểm chất lượng ảnh.</p>
           </AiCard>
         )}
 
@@ -207,7 +214,7 @@ function ApprovalDetail({ r, onApprove, onReject, onForward, onSimulateCancel })
           <div className="rounded bg-surface-bright p-2.5 text-caption font-mono text-text-secondary space-y-1">
             <div>[14:20:12] KIOSK_03: Chụp lỗi (vùng chói &gt; 35%)</div>
             <div>[14:20:45] {r.subjectId} tạo {r.id}</div>
-            <div>[14:21:03] AI: độ chắc chắn {r.ai?.confidence ?? '—'}% (chỉ gợi ý)</div>
+            <div>[14:21:03] AI: độ chắc chắn {r.ai ? fmtPercent(r.ai.confidence) : '—'} (chỉ gợi ý)</div>
           </div>
         </section>
       </div>
@@ -261,7 +268,7 @@ function ApproveModal({ open, r, onClose, onConfirm }) {
       <div className="p-space-md bg-surface-bright border-t border-border-subtle flex items-center justify-between gap-3">
         <span className="text-caption text-text-secondary">Ký số bởi <b className="font-medium">{CURRENT_USER.name}</b></span>
         <div className="flex gap-2">
-          <button className="btn-outline" onClick={onClose}>Hủy bỏ</button>
+          <button className="btn-outline" onClick={onClose}>Hủy</button>
           <button className="btn-primary" disabled={!ok} onClick={() => onConfirm(reason.trim())}><Icon name="check" />Xác nhận phê duyệt</button>
         </div>
       </div>

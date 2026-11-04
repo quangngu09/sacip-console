@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Banner, Icon, Chip, Empty, PageHeader, ConfirmReason, SearchInput, Select, StatusDot } from '../components/ui';
+import { Banner, DataBoundary, Icon, Chip, Empty, PageHeader, ConfirmReason, SearchInput, Select, StatusDot } from '../components/ui';
 import { useApp } from '../store';
 import { SPACE_TREE, DEVICES } from '../data/mock';
 
@@ -40,6 +40,7 @@ export default function Spaces() {
       <PageHeader title="Không gian & khu vực" desc="Quản lý cây Tòa → Tầng → Phòng, loại khu vực và thiết bị gắn cố định với từng phòng."
         actions={<button className="btn-primary" onClick={() => toast('Thêm khu vực', 'Khu vực mới sẽ ở trạng thái “Chờ duyệt hạ tầng”.')}><Icon name="add" />Thêm khu vực</button>} />
 
+      <DataBoundary name="spaces" label="cây không gian" scopeNote="global">
       <Banner tone="warn" title="Hạ tầng đi trước, thiết bị theo sau." className="mb-space-md">Phòng chưa được duyệt hạ tầng thì chưa được gán camera, thiết bị hay phát hành mã QR điểm danh.</Banner>
 
       <div className="grid grid-cols-12 gap-space-md items-start">
@@ -127,6 +128,7 @@ export default function Spaces() {
           </section>
         )}
       </div>
+      </DataBoundary>
 
       <ConfirmReason open={approveAsk} onClose={() => setApproveAsk(false)} title="Duyệt hạ tầng khu vực" subtitle={room && `${room.id} • ${room.name}`} confirmLabel="Duyệt"
         onConfirm={(reason) => { patchRoom(room.id, (r) => ({ ...r, approved: true })); log(`Duyệt hạ tầng — ${reason}`, room.id); toast('Đã duyệt hạ tầng', `${room.id} có thể gán thiết bị và phát QR.`, 'success'); setApproveAsk(false); }}>

@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Banner, Icon, Chip, MetricStrip, PageHeader, ConfirmReason } from '../components/ui';
+import { Banner, DataBoundary, Icon, Chip, MetricStrip, PageHeader, ConfirmReason } from '../components/ui';
 import { useApp } from '../store';
 import { SOC_EVENTS } from '../data/mock';
+import { fmtNumber } from '../lib/format';
 
 const lv = { critical: ['status-rejected', 'Nghiêm trọng', 'error', 'text-status-rejected'], warning: ['status-pending', 'Cảnh báo', 'warning', 'text-status-pending'], info: ['status-inactive', 'Thông tin', 'info', 'text-text-secondary'] };
 const LEVEL_RANK = { critical: 0, warning: 1, info: 2 };
@@ -25,9 +26,10 @@ export default function Soc() {
       <PageHeader title="An ninh & ngoại lệ" desc="Sự kiện an ninh theo thời gian thực, ngoại lệ dạy thay và khiếu nại điểm danh. Khuôn mặt luôn được làm mờ."
         badge={openCritical > 0 && <Chip color="status-rejected" icon="error">{openCritical} sự cố nghiêm trọng</Chip>} />
 
+      <DataBoundary name="events" label="sự kiện an ninh" fill scopeNote="global">
       <MetricStrip className="mb-space-md shrink-0" items={[
-        { label: 'Thời gian phát cảnh báo', value: '1.6s', sub: 'Mục tiêu tối đa 2s' },
-        { label: 'Sự kiện 24 giờ qua', value: '1,284', sub: '98% tự động đóng' },
+        { label: 'Thời gian phát cảnh báo', value: '1,6 giây', sub: 'Mục tiêu tối đa 2 giây' },
+        { label: 'Sự kiện 24 giờ qua', value: fmtNumber(1284), sub: '98% tự động đóng' },
         { label: 'Khiếu nại điểm danh', value: '3', sub: 'Chờ tra cứu minh chứng', alert: true },
         { label: 'Dạy thay chưa xin phép', value: '7', sub: 'Tuần này' },
       ]} />
@@ -78,6 +80,7 @@ export default function Soc() {
           </section>
         )}
       </div>
+      </DataBoundary>
 
       <ConfirmReason open={!!ask} onClose={() => setAsk(null)} minLength={ask === 'evidence' ? 5 : 10}
         title={ask === 'evidence' ? 'Xem minh chứng video' : 'Đóng sự cố / Duyệt ngoại lệ'} subtitle={cur?.id}

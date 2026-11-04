@@ -1,7 +1,9 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { useApp } from '../store';
+import { useResource } from '../lib/resource';
+import { useScope } from '../lib/scope';
 
 export const Icon = ({ name, size = 18, className = '', fill = false }) => (
   <span className={`ms ${className}`} style={{ fontSize: size, fontVariationSettings: fill ? "'FILL' 1" : undefined }} aria-hidden>
@@ -279,7 +281,7 @@ export function ConfirmReason({ open, onClose, onConfirm, title, subtitle, dange
       <div className="p-space-md bg-surface-bright border-t border-border-subtle flex items-center justify-between">
         <span className="flex items-center gap-1.5 text-caption text-text-secondary"><Icon name="lock" size={16} className="text-ai-border" />Thao tác sẽ được ký số và ghi log</span>
         <div className="flex gap-2">
-          <button className="btn-outline" onClick={onClose}>Hủy bỏ</button>
+          <button className="btn-outline" onClick={onClose}>Hủy</button>
           <button disabled={!ok} className={`btn ${danger ? 'bg-status-rejected text-white hover:bg-red-700' : 'bg-primary-container text-white hover:bg-primary'} disabled:cursor-not-allowed`} onClick={() => onConfirm(reason.trim())}>
             <Icon name="check" />{confirmLabel}
           </button>
@@ -394,6 +396,80 @@ export const SearchInput = ({ value, onChange, placeholder, label, className = '
     {value && <button type="button" aria-label="Xóa nội dung tìm kiếm" className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded flex items-center justify-center text-text-secondary hover:bg-surface-container" onClick={() => onChange('')}><Icon name="close" size={16} /></button>}
   </div>
 );
+
+const blankLast = (v) => v === null || v === undefined || v === '';
+
+/** Sắp xếp theo cột: bấm lần lượt tăng dần, giảm dần, bỏ sắp xếp. accessors: { khóa: (hàng) => giá trị } */
+export function useSort(rows, accessors) {
+  const [sort, setSort] = useState(null);
+  const sorted = useMemo(() => {
+    if (!sort) return rows;
+    const get = accessors[sort.key];
+    const dir = sort.dir === 'asc' ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      const x = get(a);
+      const y = get(b);
+      if (blankLast(x) || blankLast(y)) return blankLast(x) - blankLast(y);
+      return dir * (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'vi', { numeric: true }));
+    });
+    // accessors được khai báo cố định theo từng bảng
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, sort]);
+  const toggle = (key) => setSort((s) => (s?.key !== key ? { key, dir: 'asc' } : s.dir === 'asc' ? { key, dir: 'desc' } : null));
+  return { sorted, sort, toggle };
+}
+
+export const SortTh = ({ k, table, children, className = '' }) => {
+  const dir = table.sort?.key === k ? table.sort.dir : null;
+  return (
+    <th className={className} aria-sort={dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : undefined}>
+      <button type="button" onClick={() => table.toggle(k)} className={`inline-flex items-center gap-1 h-8 -mx-1 px-1 rounded font-medium hover:text-text-primary ${dir ? 'text-primary-container' : ''}`}>
+        {children}
+        <Icon name={dir === 'asc' ? 'arrow_upward' : dir === 'desc' ? 'arrow_downward' : 'unfold_more'} size={14} className={dir ? '' : 'text-border-control'} />
+      </button>
+    </th>
+  );
+};
+
+const SCOPE_NOTE = {
+  global: 'Trang này áp dụng toàn trường, không lọc theo đơn vị hay đối tượng.',
+  units: 'Trang này lọc theo đơn vị, chưa tách theo đối tượng.',
+};
+
+/** Bao nội dung một trang: xử lý trạng thái đang tải, lỗi và phạm vi chưa có dữ liệu. */
+export function DataBoundary({ name, label, fill = false, scopeNote, children }) {
+  const { status, reload } = useResource(name);
+  const { scope, primaryTenant, allUnits, allSubjects } = useScope();
+  const box = `card ${fill ? 'flex-1 min-h-0' : ''}`;
+  if (!primaryTenant) return <div className={box}><Empty icon="domain_disabled" title={`${scope.tenant} chưa có dữ liệu`} desc="Đơn vị này chưa được kết nối vào hệ thống. Đổi phạm vi ở thanh trên cùng để xem đơn vị khác." /></div>;
+  if (status === 'loading') {
+    return (
+      <div className={`${box} p-space-md flex flex-col gap-3 overflow-hidden`} role="status" aria-busy="true">
+        <span className="sr-only">Đang tải {label}…</span>
+        {[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="h-10 rounded bg-surface-container animate-pulse" />)}
+      </div>
+    );
+  }
+  if (status === 'error') {
+    return (
+      <div className={box} role="alert">
+        <div className="py-12 flex flex-col items-center text-center">
+          <Icon name="cloud_off" size={32} className="text-status-rejected mb-2" />
+          <div className="text-label-md font-semibold">Không tải được {label}</div>
+          <p className="text-caption text-text-secondary mt-0.5 mb-3">Kiểm tra kết nối mạng rồi thử lại. Nếu vẫn lỗi, liên hệ bộ phận kỹ thuật.</p>
+          <button className="btn-primary" onClick={reload}><Icon name="refresh" />Thử lại</button>
+        </div>
+      </div>
+    );
+  }
+  const showNote = scopeNote === 'global' ? !allUnits || !allSubjects : scopeNote === 'units' && !allSubjects;
+  return (
+    <>
+      {showNote && <p className="mb-2 text-caption text-text-secondary flex items-center gap-1.5 shrink-0"><Icon name="info" size={14} />{SCOPE_NOTE[scopeNote]}</p>}
+      {children}
+    </>
+  );
+}
 
 export const Empty = ({ icon = 'inbox', title, desc }) => (
   <div className="py-12 flex flex-col items-center text-center text-text-secondary">

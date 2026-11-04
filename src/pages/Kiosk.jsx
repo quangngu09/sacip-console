@@ -66,7 +66,7 @@ function CamView({ label, status, phase, slot, videoRef, big }) {
       {(big || live) && (
         <div className="relative flex justify-between gap-2 text-white">
           <span className="px-1.5 py-0.5 rounded bg-black/60 truncate">{slot ? `${slot.label}${res ? ` • ${res}` : ''}` : '—'}</span>
-          {big && <span className="px-1.5 py-0.5 rounded bg-black/60 shrink-0">{live ? status : 'Offline'}</span>}
+          {big && <span className="px-1.5 py-0.5 rounded bg-black/60 shrink-0">{live ? status : 'Mất kết nối'}</span>}
         </div>
       )}
     </div>
@@ -141,7 +141,7 @@ export default function Kiosk() {
     }, 700);
   };
   const print = () => { setPrinted((p) => p - 1); setPhase('printed'); log('In thẻ sinh viên', student.id, 'system'); flash('Đang in thẻ', `Zebra ZC300 • còn ${printed - 1} phôi`); };
-  const save = () => { log('Lưu hồ sơ & đẩy ảnh qua API Ingestion', student.id, 'system'); flash('Đã lưu hồ sơ', 'Ảnh chuyển qua Quality Gating → trích xuất vector 512d.', 'success'); reset(); };
+  const save = () => { log('Lưu hồ sơ và gửi ảnh đi xử lý', student.id, 'system'); flash('Đã lưu hồ sơ', 'Ảnh chuyển qua Quality Gating → trích xuất vector 512d.', 'success'); reset(); };
 
   useEffect(() => {
     const h = (e) => {
@@ -182,7 +182,7 @@ export default function Kiosk() {
         <div className="flex items-center justify-between gap-6 mb-4">
           <div className="min-w-0">
             <h1 className="text-k-headline-lg truncate">{student ? `Đang phục vụ: ${student.name}` : liveCount ? 'Trạm sẵn sàng tiếp nhận' : cams.error ? 'Trạm chưa có camera' : 'Đang kiểm tra camera…'}</h1>
-            <p className="text-caption text-text-secondary">Đồng bộ dữ liệu sinh viên K69 • Chuẩn ICAO 9303 • Liveness v3.2</p>
+            <p className="text-caption text-text-secondary">Đồng bộ dữ liệu sinh viên K69 • Chuẩn ICAO 9303 • Kiểm tra người thật v3.2</p>
           </div>
           <Stepper current={STEP_OF[phase]} />
         </div>
@@ -344,7 +344,7 @@ export default function Kiosk() {
           <input id="kiosk-mssv" autoFocus value={mssv} onChange={(e) => setMssv(e.target.value)} className="input !h-12 text-k-title-md font-mono select-text" placeholder="Ví dụ: 2024-7890" />
           <p className="mt-1.5 text-caption text-text-secondary">Nhấn Enter để tải thông tin và kích hoạt giàn camera.</p>
           <div className="mt-6 flex justify-end gap-3">
-            <button type="button" className={actionBtn(false)} onClick={() => setManual(false)}>Hủy bỏ<Kbd>Esc</Kbd></button>
+            <button type="button" className={actionBtn(false)} onClick={() => setManual(false)}>Hủy<Kbd>Esc</Kbd></button>
             <button className={actionBtn(true)} disabled={!mssv.trim()}>Tiếp nhận chụp ảnh<Icon name="arrow_forward" /></button>
           </div>
         </form>

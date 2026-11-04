@@ -37,6 +37,13 @@ Build: `npm run build` (thư mục `dist/`), hoặc `npm run build:single` để
 - Màu trạng thái chỉ dùng cho trạng thái, luôn kèm chữ hoặc icon. Cảnh báo dùng vàng hổ phách để không lẫn với cam thương hiệu.
 - Chữ: nội dung và bảng 14px, chú thích tối thiểu 12px, tiêu đề khối 16px, tiêu đề trang 24px.
 - Điều khiển: `btn-sm` 32px, `btn` và ô nhập 40px, `btn-lg` 48px; Kiosk 56px. Bo góc 4px cho điều khiển, 8px cho khối.
-- Component dùng chung ở `src/components/ui.jsx`: `Select`, `Tabs`, `Banner`, `MetricStrip`, `SearchInput`, `PageHeader`, `Modal`, `Drawer`, `ConfirmReason`. Bảng dùng class `.data-table`.
+- Component dùng chung ở `src/components/ui.jsx`: `Select`, `Tabs`, `Banner`, `MetricStrip`, `SearchInput`, `PageHeader`, `Modal`, `Drawer`, `ConfirmReason`, `DataBoundary`, `SortTh`. Bảng dùng class `.data-table` và hook `useSort`.
+- Thuật ngữ và định dạng số, ngày: xem [docs/glossary.md](docs/glossary.md).
+- Phạm vi: dùng `useScope` (`src/lib/scope.js`) để lọc theo đơn vị và đối tượng. Trang hạ tầng (thiết bị, không gian, quy tắc, an ninh, AI, nhật ký) áp dụng toàn trường và có ghi chú khi đang chọn đơn vị.
+
+## Trạng thái dữ liệu
+`DataBoundary` hiển thị trạng thái đang tải, lỗi kèm "Thử lại" và phạm vi chưa có dữ liệu. Khi có backend, chỉ cần thay `loadResource` trong `src/lib/resource.js` bằng lời gọi API.
+
+Khi chạy dev có thể xem thử bằng cách thêm vào đường dẫn: `#/ho-so?demo=loading` hoặc `#/ho-so?demo=error`.
 
 Dữ liệu là mock (`src/data/mock.js`), trạng thái giữ trong `src/store.jsx` — thay bằng API khi tích hợp backend.

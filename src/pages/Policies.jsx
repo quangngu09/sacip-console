@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { Icon, Chip, Empty, PageHeader, Modal, Select, ConfirmReason, Tabs } from '../components/ui';
+import { DataBoundary, Icon, Chip, Empty, PageHeader, Modal, Select, SortTh, ConfirmReason, Tabs, useSort } from '../components/ui';
 import { useApp } from '../store';
 import { RULES } from '../data/mock';
+import { fmtNumber } from '../lib/format';
 
 const GROUPS = ['Sinh viên lớp học phần', 'Giảng viên phụ trách môn', 'Danh sách cấm', 'Không có quyền', 'Cán bộ hành chính', 'Khách tham quan'];
 const SPACES = ['Phòng học (Tòa C)', 'Phòng Server A501', 'Cổng & sảnh', 'KTX Tòa B', 'Phòng LAB 402'];
 const TIMES = ['Theo lịch học, ±15 phút', '24/7', 'Giờ hành chính (07:30–17:00)', '06:00–21:00'];
 const ACTIONS = ['Ghi có mặt / đi muộn', 'Còi tại chỗ + báo an ninh (≤2s)', 'Ghi nhật ký kiểm toán', 'Bật/tắt ghi hình', 'Cho phép mở cửa'];
 const BLANK = { name: '', group: GROUPS[0], space: SPACES[0], time: TIMES[0], action: ACTIONS[0] };
+const SORTERS = { name: (r) => r.name, group: (r) => r.group, action: (r) => r.action, type: (r) => r.type, hits: (r) => r.hits };
 const TYPE_HINT = {
   all: 'Mỗi quy tắc gồm: đối tượng + không gian + thời gian → hành động.',
   realtime: 'Phản ứng trong 2 giây: còi tại chỗ và báo an ninh khi có người trong danh sách cấm hoặc người lạ ở khu vực hạn chế.',
@@ -23,6 +25,7 @@ export default function Policies() {
   const [dry, setDry] = useState(null);
   const [toggleAsk, setToggleAsk] = useState(null);
   const rows = rules.filter((r) => type === 'all' || r.type === type);
+  const table = useSort(rows, SORTERS);
 
   const runDry = () => {
     const rt = form.action.includes('báo an ninh');
@@ -42,6 +45,7 @@ export default function Policies() {
       <PageHeader title="Quy tắc & chính sách" desc="Thiết lập việc hệ thống tự làm khi nhận diện được một đối tượng tại một không gian, trong một khung giờ."
         actions={<button className="btn-primary" onClick={() => setEditor(true)}><Icon name="add" />Tạo quy tắc</button>} />
 
+      <DataBoundary name="rules" label="danh sách quy tắc" scopeNote="global">
       <div className="card overflow-hidden">
         <Tabs label="Loại quy tắc" className="px-2 border-b border-border-subtle" value={type} onChange={setType} items={[
           { key: 'all', label: 'Tất cả', count: rules.length },
@@ -51,15 +55,15 @@ export default function Policies() {
         <p className="px-space-md py-2 text-caption text-text-secondary border-b border-border-subtle">{TYPE_HINT[type]}</p>
         <div className="overflow-x-auto">
           <table className="data-table">
-            <thead><tr>{['Quy tắc', 'Áp dụng cho', 'Hành động', 'Loại', 'Lượt khớp 30 ngày', 'Bật / tắt'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+            <thead><tr><SortTh k="name" table={table}>Quy tắc</SortTh><SortTh k="group" table={table}>Áp dụng cho</SortTh><SortTh k="action" table={table}>Hành động</SortTh><SortTh k="type" table={table}>Loại</SortTh><SortTh k="hits" table={table}>Lượt khớp 30 ngày</SortTh><th>Bật / tắt</th></tr></thead>
             <tbody>
-              {rows.map((r) => (
+              {table.sorted.map((r) => (
                 <tr key={r.id} className="h-16 hover:bg-surface-container-low">
                   <td className="min-w-[220px]"><div className="font-medium">{r.name}</div><div className="text-caption font-mono text-text-secondary">{r.id}</div></td>
                   <td className="min-w-[220px]"><div>{r.group}</div><div className="text-caption text-text-secondary">{r.space} • {r.time}</div></td>
                   <td>{r.action}</td>
                   <td className="whitespace-nowrap">{r.type === 'realtime' ? <Chip color="status-rejected" icon="bolt">Tức thời</Chip> : <Chip color="primary">Ghi nhận</Chip>}</td>
-                  <td className="tabular-nums whitespace-nowrap">{r.hits.toLocaleString('vi-VN')}</td>
+                  <td className="tabular-nums whitespace-nowrap">{fmtNumber(r.hits)}</td>
                   <td>
                     <button role="switch" aria-checked={r.enabled} aria-label={`${r.enabled ? 'Tắt' : 'Bật'} quy tắc ${r.id}: ${r.name}`} onClick={() => setToggleAsk(r)}
                       className={`w-11 h-6 rounded-full relative transition-colors ${r.enabled ? 'bg-status-active' : 'bg-border-control'}`}>
@@ -73,6 +77,7 @@ export default function Policies() {
           {rows.length === 0 && <Empty title="Chưa có quy tắc" />}
         </div>
       </div>
+      </DataBoundary>
 
       <Modal open={editor} onClose={closeEditor} width="max-w-2xl">
         <div className="p-space-md border-b border-border-subtle flex items-center justify-between"><h3 className="text-k-title-md">Tạo quy tắc mới</h3><button aria-label="Đóng" className="w-8 h-8 rounded flex items-center justify-center text-text-secondary hover:bg-surface-container" onClick={closeEditor}><Icon name="close" size={20} /></button></div>
@@ -93,8 +98,8 @@ export default function Policies() {
             <div className="flex items-center justify-between gap-3"><div><h4 className="text-label-md font-semibold">Chạy thử</h4><p className="text-caption text-text-secondary">Thử trên dữ liệu 24 giờ gần nhất, không tác động thật.</p></div><button className="btn-outline" onClick={runDry}><Icon name="play_arrow" />Chạy thử</button></div>
             {dry && (
               <dl className="grid grid-cols-3 gap-2 mt-3 anim-fade">
-                <div className="p-2 rounded bg-surface"><dt className="text-caption text-text-secondary">Sự kiện đầu vào</dt><dd className="font-semibold tabular-nums">{dry.events.toLocaleString('vi-VN')}</dd></div>
-                <div className="p-2 rounded bg-surface"><dt className="text-caption text-text-secondary">Sẽ kích hoạt</dt><dd className="font-semibold tabular-nums">{dry.matched.toLocaleString('vi-VN')}</dd></div>
+                <div className="p-2 rounded bg-surface"><dt className="text-caption text-text-secondary">Sự kiện đầu vào</dt><dd className="font-semibold tabular-nums">{fmtNumber(dry.events)}</dd></div>
+                <div className="p-2 rounded bg-surface"><dt className="text-caption text-text-secondary">Sẽ kích hoạt</dt><dd className="font-semibold tabular-nums">{fmtNumber(dry.matched)}</dd></div>
                 <div className={`p-2 rounded ${dry.conflicts ? 'bg-status-rejected/10' : 'bg-surface'}`}><dt className="text-caption text-text-secondary">Xung đột quy tắc</dt><dd className={`font-semibold ${dry.conflicts ? 'text-status-rejected' : 'text-status-active'}`}>{dry.conflicts ? `${dry.conflicts}: xung đột R-004` : 'Không có'}</dd></div>
               </dl>
             )}

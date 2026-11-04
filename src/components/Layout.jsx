@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Icon, Select } from './ui';
 import { useApp } from '../store';
+import { useScope } from '../lib/scope';
 import { CURRENT_USER, TENANTS, ORG_UNITS, SUBJECT_TYPES } from '../data/mock';
 import logo from '../assets/logo-dnu.svg';
 
@@ -27,7 +28,8 @@ const NAV = [
 
 function Sidebar() {
   const { requests } = useApp();
-  const pending = requests.filter((r) => r.status === 'pending').length;
+  const { primaryTenant, matchUnit, matchSubject } = useScope();
+  const pending = primaryTenant ? requests.filter((r) => r.status === 'pending' && matchUnit(r.unit) && matchSubject(r.subjectId)).length : 0;
   return (
     <aside className="fixed left-0 top-0 h-full w-[240px] bg-rail z-40 flex flex-col">
       <div className="h-14 px-3 bg-surface flex items-center gap-2.5 border-b border-border-subtle">
@@ -52,7 +54,7 @@ function Sidebar() {
         ))}
         <div className="border-t border-rail-line pt-2">
           <NavLink to="/kiosk" className="flex items-center gap-2.5 h-9 px-2.5 rounded text-label-md text-rail-text hover:bg-rail-hover hover:text-white focus-visible:outline-white">
-            <Icon name="photo_camera_front" size={18} /><span>Mở Kiosk Trạm chụp</span><Icon name="open_in_new" size={14} className="ml-auto" />
+            <Icon name="photo_camera_front" size={18} /><span>Mở Kiosk trạm chụp</span><Icon name="open_in_new" size={14} className="ml-auto" />
           </NavLink>
         </div>
       </nav>

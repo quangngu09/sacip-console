@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Icon, Chip, Empty, MetricStrip, PageHeader, SearchInput, Select, StatusDot } from '../components/ui';
+import { DataBoundary, Icon, Chip, Empty, MetricStrip, PageHeader, SearchInput, Select, SortTh, StatusDot, useSort } from '../components/ui';
 import { useApp } from '../store';
 import { DEVICES } from '../data/mock';
 
+const SORTERS = { id: (d) => d.id, vendor: (d) => d.vendor, ip: (d) => d.ip, room: (d) => d.room, online: (d) => (d.online ? 0 : 1), ntp: (d) => (d.ntp ? 0 : 1) };
 const CONNECTION_OPTIONS = [{ value: 'all', label: 'Tất cả kết nối' }, { value: 'on', label: 'Trực tuyến' }, { value: 'off', label: 'Mất kết nối' }, { value: 'unassigned', label: 'Chưa gán phòng' }];
 
 export default function Devices() {
@@ -18,6 +19,7 @@ export default function Devices() {
     .filter((d) => kind === 'all' || d.kind === kind)
     .filter((d) => connection === 'all' || (connection === 'on' ? d.online : connection === 'off' ? !d.online : !d.room))
     .filter((d) => !q || `${d.id} ${d.ip} ${d.mac} ${d.serial} ${d.room || ''} ${d.vendor}`.toLowerCase().includes(q.toLowerCase()));
+  const table = useSort(rows, SORTERS);
   const canReset = kind !== 'all' || connection !== 'all' || !!q;
   const reset = () => { setKind('all'); setConnection('all'); setQ(''); };
 
@@ -29,6 +31,7 @@ export default function Devices() {
           <button className="btn-primary" onClick={() => toast('Khai báo thiết bị', 'Thiết bị mới cần được gán vào phòng đã duyệt hạ tầng.')}><Icon name="add" />Khai báo thiết bị</button>
         </>} />
 
+      <DataBoundary name="devices" label="danh sách thiết bị" fill scopeNote="global">
       <MetricStrip className="mb-space-md shrink-0" items={[
         { label: 'Tổng thiết bị', value: devices.length, sub: `${kinds.length - 1} loại thiết bị` },
         { label: 'Trực tuyến', value: online, sub: `${Math.round((online / devices.length) * 100)}% tổng số` },
@@ -47,17 +50,17 @@ export default function Devices() {
         <div className="flex-1 min-h-0 overflow-auto">
           <table className="data-table">
             <thead><tr>
-              <th className="sticky top-0 z-10">Thiết bị</th>
-              <th className="sticky top-0 z-10">Hãng và serial</th>
-              <th className="sticky top-0 z-10">Địa chỉ mạng</th>
+              <SortTh k="id" table={table} className="sticky top-0 z-10">Thiết bị</SortTh>
+              <SortTh k="vendor" table={table} className="sticky top-0 z-10">Hãng và serial</SortTh>
+              <SortTh k="ip" table={table} className="sticky top-0 z-10">Địa chỉ mạng</SortTh>
               <th className="sticky top-0 z-10 hidden min-[1400px]:table-cell">Cổng switch</th>
-              <th className="sticky top-0 z-10">Phòng</th>
-              <th className="sticky top-0 z-10">Kết nối</th>
-              <th className="sticky top-0 z-10">Đồng bộ giờ</th>
+              <SortTh k="room" table={table} className="sticky top-0 z-10">Phòng</SortTh>
+              <SortTh k="online" table={table} className="sticky top-0 z-10">Kết nối</SortTh>
+              <SortTh k="ntp" table={table} className="sticky top-0 z-10">Đồng bộ giờ</SortTh>
               <th className="sticky top-0 right-0 z-20 text-right">Thao tác</th>
             </tr></thead>
             <tbody>
-              {rows.map((d) => (
+              {table.sorted.map((d) => (
                 <tr key={d.id} className="h-14 bg-surface hover:bg-surface-container-low">
                   <td><div className="font-mono font-medium whitespace-nowrap">{d.id}</div><div className="text-caption text-text-secondary whitespace-nowrap">{d.kind}</div></td>
                   <td><div>{d.vendor}</div><div className="text-caption font-mono text-text-secondary whitespace-nowrap">{d.serial}</div></td>
@@ -77,6 +80,7 @@ export default function Devices() {
         </div>
         <div className="h-10 px-space-md border-t border-border-subtle text-caption text-text-secondary flex items-center shrink-0" aria-live="polite">Hiển thị {rows.length} / {devices.length} thiết bị</div>
       </div>
+      </DataBoundary>
     </div>
   );
 }
