@@ -26,7 +26,7 @@ export default function Devices() {
         {kinds.map((k) => <button key={k} onClick={() => setKind(k)} className={`px-3 py-1 rounded-full text-label-sm ${kind === k ? 'bg-primary-container text-white' : 'bg-surface shadow-soft hover:bg-surface-container-low'}`}>{k}</button>)}
       </div>
 
-      <div className="card overflow-hidden">
+      <div className="card overflow-x-auto">
         <table className="w-full text-left text-body-sm">
           <thead className="bg-surface-bright sticky top-0"><tr className="h-10 text-[12px] uppercase tracking-wider text-text-secondary">
             {['Device ID', 'Loại', 'Hãng', 'IP', 'MAC / BSSID / UUID', 'Port Switch', 'Serial', 'Room_ID', 'Trạng thái', 'NTP', ''].map((h) => <th key={h} className="px-3 font-medium whitespace-nowrap">{h}</th>)}

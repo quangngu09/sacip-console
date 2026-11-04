@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../store';
 
 export const Icon = ({ name, size = 18, className = '', fill = false }) => (
@@ -72,6 +73,121 @@ export function FaceThumb({ seed = 1, size = 36, round = true, revealed = false,
   );
 }
 
+const foldText = (s) => s.normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/gi, 'd').toLowerCase();
+
+const SELECT_TRIGGER = {
+  field: 'w-full min-h-[34px] px-2.5 py-1.5 bg-surface border border-border-strong rounded-lg text-body-sm hover:border-status-inactive disabled:bg-surface-container-low disabled:text-text-secondary disabled:border-border-subtle disabled:cursor-not-allowed',
+  inline: 'max-w-[240px] px-2 py-1 rounded-lg text-label-md font-medium hover:bg-surface-container-low',
+};
+
+/** Select một lựa chọn theo mẫu combobox của WAI-ARIA. Menu render qua portal nên không bị modal/bảng cắt. */
+export function Select({ value, onChange, options, label, placeholder = 'Chọn…', disabled = false, variant = 'field', wrap = false, className = '' }) {
+  const items = options.map((o) => (typeof o === 'string' ? { value: o, label: o } : o));
+  const selected = items.find((o) => o.value === value);
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const [pos, setPos] = useState(null);
+  const btn = useRef();
+  const menu = useRef();
+  const typed = useRef({ text: '', timer: null });
+  const id = useId();
+
+  const show = (index = items.indexOf(selected)) => { setActive(Math.max(index, 0)); setPos(null); setOpen(true); };
+  const commit = (o) => { setOpen(false); if (o && o.value !== value) onChange(o.value); };
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const r = btn.current.getBoundingClientRect();
+      const h = menu.current.scrollHeight + 2;
+      const below = window.innerHeight - r.bottom - 12;
+      const above = r.top - 12;
+      const up = h > below && above > below;
+      const maxWidth = Math.max(r.width, 420);
+      const width = Math.min(Math.max(menu.current.offsetWidth, r.width), maxWidth);
+      setPos({
+        left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)), minWidth: r.width, maxWidth, maxHeight: Math.min(up ? above : below, 288),
+        ...(up ? { bottom: window.innerHeight - r.top + 4 } : { top: r.bottom + 4 }),
+      });
+    };
+    place();
+    const outside = (e) => {
+      if (btn.current.contains(e.target) || menu.current?.contains(e.target)) return;
+      // Giữ focus khi bấm nhãn, nếu không onBlur đóng menu rồi click của nhãn lại mở ra.
+      if ([...btn.current.labels].some((l) => l.contains(e.target))) { e.preventDefault(); return; }
+      setOpen(false);
+    };
+    const onScroll = (e) => { if (!menu.current?.contains(e.target)) place(); };
+    document.addEventListener('mousedown', outside);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', place);
+    return () => {
+      document.removeEventListener('mousedown', outside);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', place);
+    };
+  }, [open]);
+
+  useEffect(() => { if (open && pos) menu.current?.children[active]?.scrollIntoView({ block: 'nearest' }); }, [open, pos, active]);
+  useEffect(() => () => clearTimeout(typed.current.timer), []);
+
+  const typeAhead = (key) => {
+    const t = typed.current;
+    clearTimeout(t.timer);
+    t.text += foldText(key);
+    t.timer = setTimeout(() => { t.text = ''; }, 600);
+    const from = open ? active + (t.text.length === 1 ? 1 : 0) : 0;
+    const order = [...items.slice(from), ...items.slice(0, from)];
+    const hit = order.find((o) => foldText(o.label).startsWith(t.text));
+    if (!hit) { if (!open) show(); return; }
+    if (open) setActive(items.indexOf(hit)); else show(items.indexOf(hit));
+  };
+
+  const onKeyDown = (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const printable = e.key.length === 1 && (e.key !== ' ' || typed.current.text);
+    const last = items.length - 1;
+    const moves = { ArrowDown: Math.min(active + 1, last), ArrowUp: Math.max(active - 1, 0), Home: 0, End: last, PageDown: Math.min(active + 8, last), PageUp: Math.max(active - 8, 0) };
+    if (printable) typeAhead(e.key);
+    else if (!open) { if (!['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) return; show(); }
+    else if (e.key in moves) setActive(moves[e.key]);
+    else if (e.key === 'Enter' || e.key === ' ') commit(items[active]);
+    else if (e.key === 'Escape') setOpen(false);
+    else { if (e.key === 'Tab') commit(items[active]); return; }
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  return (
+    <>
+      <button ref={btn} type="button" role="combobox" aria-label={label} aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? id : undefined}
+        aria-activedescendant={open && items[active] ? `${id}-${active}` : undefined} disabled={disabled} title={wrap ? undefined : selected?.label}
+        className={`flex items-center justify-between gap-1.5 text-left transition-colors ${SELECT_TRIGGER[variant]} ${open && variant === 'field' ? 'border-primary-container ring-1 ring-primary-container hover:border-primary-container' : ''} ${open && variant === 'inline' ? 'bg-surface-container hover:bg-surface-container' : ''} ${className}`}
+        onClick={() => (open ? setOpen(false) : show())} onBlur={() => setOpen(false)} onKeyDown={onKeyDown} onKeyUp={(e) => e.key === ' ' && e.preventDefault()}>
+        <span className={`min-w-0 ${wrap ? '' : 'truncate'} ${selected ? '' : 'text-text-secondary'}`}>{selected ? selected.label : placeholder}</span>
+        <Icon name="expand_more" size={18} className={`text-text-secondary transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && createPortal(
+        <ul ref={menu} id={id} role="listbox" aria-label={label} className="fixed z-[70] w-max p-1 bg-surface border border-border-strong rounded-lg shadow-lg overflow-y-auto text-text-primary"
+          style={pos || { top: 0, left: 0, visibility: 'hidden' }} onMouseDown={(e) => e.preventDefault()}>
+          {items.length === 0 && <li className="px-2.5 py-1.5 text-body-sm text-text-secondary">Không có lựa chọn</li>}
+          {items.map((o, i) => {
+            const isSel = o.value === value;
+            return (
+              <li key={o.value} id={`${id}-${i}`} role="option" aria-selected={isSel} onMouseMove={() => setActive(i)} onClick={() => commit(o)}
+                className={`flex items-center justify-between gap-3 px-2.5 py-1.5 rounded cursor-pointer text-body-sm ${i === active ? 'bg-surface-container' : ''} ${isSel ? 'font-medium text-primary' : ''}`}>
+                <span className="min-w-0 break-words">{o.label}</span>
+                <Icon name="check" size={16} className={isSel ? '' : 'invisible'} />
+              </li>
+            );
+          })}
+        </ul>,
+        document.body,
+      )}
+    </>
+  );
+}
+
 export function Modal({ open, onClose, children, width = 'max-w-xl' }) {
   useEffect(() => {
     if (!open) return;
@@ -81,7 +197,7 @@ export function Modal({ open, onClose, children, width = 'max-w-xl' }) {
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-[2px]" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50" onClick={onClose}>
       <div className={`w-full ${width} bg-surface rounded-xl shadow-xl overflow-hidden flex flex-col anim-fade max-h-[92vh]`} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal>
         {children}
       </div>
@@ -98,7 +214,7 @@ export function Drawer({ open, onClose, children, width = 480 }) {
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[55] flex justify-end bg-slate-900/30 backdrop-blur-[2px]" onClick={onClose}>
+    <div className="fixed inset-0 z-[55] flex justify-end bg-slate-900/30" onClick={onClose}>
       <div className="h-full bg-surface shadow-xl border-l border-border-subtle flex flex-col anim-slide" style={{ width }} onClick={(e) => e.stopPropagation()}>
         {children}
       </div>
@@ -114,9 +230,7 @@ export function ConfirmReason({ open, onClose, onConfirm, title, subtitle, dange
   return (
     <Modal open={open} onClose={onClose} width="max-w-lg">
       <div className="p-space-md border-b border-border-subtle flex items-center gap-2.5">
-        <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${danger ? 'bg-status-rejected/10 text-status-rejected' : 'bg-primary-fixed text-primary-container'}`}>
-          <Icon name={danger ? 'gpp_maybe' : 'verified_user'} size={22} />
-        </div>
+        <Icon name={danger ? 'gpp_maybe' : 'verified_user'} size={22} className={danger ? 'text-status-rejected' : 'text-primary-container'} />
         <div className="flex-1">
           <h3 className="text-headline-md">{title}</h3>
           {subtitle && <p className="text-caption text-text-secondary">{subtitle}</p>}
@@ -166,23 +280,17 @@ export function Toasts() {
 }
 
 export const AiCard = ({ children, className = '' }) => (
-  <div className={`rounded-lg p-space-md bg-ai-surface border border-ai-border ${className}`}>
-    <div className="flex items-center gap-2 mb-2">
-      <Icon name="smart_toy" size={20} className="text-ai-border" />
-      <span className="text-label-md font-semibold">Gợi ý của AI – người duyệt quyết định</span>
-    </div>
+  <div className={`rounded-lg p-space-md bg-ai-surface border border-border-subtle ${className}`}>
+    <div className="mb-2 text-label-md font-semibold">Gợi ý của AI – người duyệt quyết định</div>
     {children}
   </div>
 );
 
-export const PageHeader = ({ icon, title, badge, desc, actions }) => (
+export const PageHeader = ({ title, badge, desc, actions }) => (
   <div className="flex items-center justify-between gap-4 mb-space-md">
-    <div className="flex items-center gap-3 min-w-0">
-      {icon && <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-primary-container shrink-0"><Icon name={icon} size={22} /></div>}
-      <div className="min-w-0">
-        <div className="flex items-center gap-2"><h1 className="text-headline-lg">{title}</h1>{badge}</div>
-        {desc && <p className="text-caption text-text-secondary truncate">{desc}</p>}
-      </div>
+    <div className="min-w-0">
+      <div className="flex items-center gap-2"><h1 className="text-headline-lg">{title}</h1>{badge}</div>
+      {desc && <p className="text-caption text-text-secondary truncate">{desc}</p>}
     </div>
     {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
   </div>

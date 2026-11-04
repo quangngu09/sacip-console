@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Icon, Chip, PageHeader, ConfirmReason } from '../components/ui';
+import { Icon, Chip, PageHeader, ConfirmReason, Select } from '../components/ui';
 import { useApp } from '../store';
 import { SPACE_TREE, DEVICES } from '../data/mock';
 
@@ -76,9 +76,7 @@ export default function Spaces() {
             <div className="p-space-md flex flex-col gap-space-md">
               <div className="grid grid-cols-2 gap-space-md">
                 <label className="flex flex-col gap-1 text-label-md font-semibold">Loại Zone
-                  <select className="input" value={room.zone} onChange={(e) => { patchRoom(room.id, (r) => ({ ...r, zone: e.target.value })); log(`Đổi Zone ${room.id} → ${e.target.value}`, room.id); }}>
-                    {['Public', 'Operational', 'Restricted', 'Forbidden'].map((z) => <option key={z}>{z}</option>)}
-                  </select>
+                  <Select className="font-normal" label="Loại Zone" value={room.zone} options={['Public', 'Operational', 'Restricted', 'Forbidden']} onChange={(z) => { patchRoom(room.id, (r) => ({ ...r, zone: z })); log(`Đổi Zone ${room.id} → ${z}`, room.id); }} />
                 </label>
                 <div className="text-caption text-text-secondary self-end pb-1.5">Zone quyết định rule áp dụng: Restricted/Forbidden kích hoạt cảnh báo real-time ≤2s.</div>
               </div>
@@ -108,10 +106,7 @@ export default function Spaces() {
               <div className={`p-3 rounded-lg border border-border-subtle ${room.approved ? '' : 'opacity-60'}`}>
                 <div className="text-label-md font-semibold mb-2 flex items-center gap-1.5"><Icon name="add_link" />Gán thiết bị vào phòng</div>
                 <div className="flex gap-2">
-                  <select className="input" value={assign} onChange={(e) => setAssign(e.target.value)} disabled={!room.approved}>
-                    <option value="">— Chọn thiết bị chưa gán —</option>
-                    {free.map((d) => <option key={d.id} value={d.id}>{d.id} • {d.kind}</option>)}
-                  </select>
+                  <Select className="min-w-0 flex-1" label="Thiết bị chưa gán" placeholder="Chọn thiết bị chưa gán" value={assign} options={free.map((d) => ({ value: d.id, label: `${d.id} • ${d.kind}` }))} onChange={setAssign} disabled={!room.approved} />
                   <button className="btn-primary shrink-0 disabled:opacity-40" onClick={doAssign} disabled={!room.approved || !assign}><Icon name="link" />Gán</button>
                 </div>
                 {!room.approved && <p className="text-caption text-status-pending mt-1.5 flex items-center gap-1"><Icon name="lock" size={14} />Bị khóa cho đến khi phòng được duyệt hạ tầng.</p>}

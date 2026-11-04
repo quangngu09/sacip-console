@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Icon, Chip, PageHeader, Modal } from '../components/ui';
+import { Icon, Chip, PageHeader, Modal, Select } from '../components/ui';
 import { useApp } from '../store';
 import { RULES } from '../data/mock';
 
@@ -72,9 +72,9 @@ export default function Policies() {
           <div className="flex items-stretch gap-2">
             {[['group', 'Nhóm đối tượng', GROUPS, 'groups'], ['space', 'Phòng / Zone', SPACES, 'meeting_room'], ['time', 'Khung thời gian', TIMES, 'schedule'], ['action', 'Hành động', ACTIONS, 'bolt']].map(([k, l, opts, ic], i) => (
               <div key={k} className="flex items-center gap-2 flex-1">
-                <label className="flex-1 p-2.5 rounded-lg bg-surface-container-low flex flex-col gap-1">
+                <label className="flex-1 min-w-0 self-stretch flex flex-col gap-1">
                   <span className="text-caption text-text-secondary flex items-center gap-1"><Icon name={ic} size={14} />{l}</span>
-                  <select className="bg-transparent text-body-sm font-medium outline-none" value={form[k]} onChange={(e) => { setForm({ ...form, [k]: e.target.value }); setDry(null); }}>{opts.map((o) => <option key={o}>{o}</option>)}</select>
+                  <Select wrap className="flex-1" label={l} value={form[k]} options={opts} onChange={(v) => { setForm({ ...form, [k]: v }); setDry(null); }} />
                 </label>
                 {i < 3 && <Icon name="arrow_forward" className="text-status-inactive" />}
               </div>

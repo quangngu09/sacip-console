@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Icon, Chip, FaceThumb, Modal, ConfirmReason, AiCard, Empty } from '../components/ui';
+import { Icon, Chip, FaceThumb, Modal, ConfirmReason, AiCard, Empty, Select } from '../components/ui';
 import { useApp } from '../store';
 import { CURRENT_USER } from '../data/mock';
 
@@ -8,6 +8,7 @@ const TABS = [
 ];
 const kindColor = { rescan: 'primary', new: 'neutral', revoke: 'status-rejected', consent: 'secondary', extend: 'neutral' };
 const prioColor = { 'Khẩn cấp': 'bg-status-rejected text-white', Cao: 'bg-status-rejected/10 text-status-rejected' };
+const FORWARD_TARGETS = ['Trưởng Phòng Đào tạo', 'Phòng Pháp chế', 'Ban Quản lý KTX'];
 
 export default function Requests() {
   const { requests, setRequests, log, toast } = useApp();
@@ -17,6 +18,7 @@ export default function Requests() {
   const [approveOpen, setApproveOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [forwardOpen, setForwardOpen] = useState(false);
+  const [forwardTo, setForwardTo] = useState(FORWARD_TARGETS[0]);
 
   const counts = useMemo(() => Object.fromEntries(TABS.map(([k]) => [k, k === 'all' ? requests.length : requests.filter((r) => r.status === k).length])), [requests]);
   const list = requests.filter((r) => tab === 'all' || r.status === tab).filter((r) => !q || `${r.id} ${r.name} ${r.subjectId}`.toLowerCase().includes(q.toLowerCase()));
@@ -125,9 +127,9 @@ export default function Requests() {
       <ConfirmReason open={rejectOpen} onClose={() => setRejectOpen(false)} danger title="Từ chối yêu cầu" subtitle={cur && `${cur.id} • ${cur.name}`} confirmLabel="Xác nhận từ chối"
         onConfirm={(reason) => { update(cur.id, { status: 'rejected', footer: 'Đã từ chối' }); log(`Từ chối yêu cầu — ${reason}`, cur.id); toast('Đã từ chối yêu cầu', 'Đối tượng sẽ nhận thông báo kèm lý do.', 'info'); setRejectOpen(false); }} />
       <ConfirmReason open={forwardOpen} onClose={() => setForwardOpen(false)} title="Chuyển cấp duyệt" subtitle={cur && cur.id} confirmLabel="Chuyển"
-        onConfirm={(reason) => { log(`Chuyển cấp duyệt — ${reason}`, cur.id); toast('Đã chuyển cấp duyệt', 'Yêu cầu chuyển tới Trưởng Phòng Đào tạo.', 'success'); setForwardOpen(false); }}>
+        onConfirm={(reason) => { log(`Chuyển cấp duyệt tới ${forwardTo} — ${reason}`, cur.id); toast('Đã chuyển cấp duyệt', `Yêu cầu chuyển tới ${forwardTo}.`, 'success'); setForwardOpen(false); }}>
         <label className="flex flex-col gap-1 text-label-md font-semibold">Chuyển tới
-          <select className="input"><option>Trưởng Phòng Đào tạo</option><option>Phòng Pháp chế</option><option>Ban Quản lý KTX</option></select>
+          <Select className="font-normal" label="Chuyển tới" value={forwardTo} options={FORWARD_TARGETS} onChange={setForwardTo} />
         </label>
       </ConfirmReason>
     </div>
