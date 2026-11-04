@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Banner, Chip, ConfirmReason, DataBoundary, Icon, PageHeader, SourceBadge, SubjectTypeChip, Tabs } from '../components/ui';
 import { useApp } from '../store';
-import { TRIGGER_SHORT, TRIGGER_TARGET } from '../api/enums';
+import { TRIGGER_SHORT, TRIGGER_TARGET, transportLabel } from '../api/enums';
 import { rollbackPolicy } from '../api/client';
 import { diffConfig } from '../api/policyValidation';
 import { fmtDateTime } from '../lib/format';
@@ -118,7 +118,7 @@ function PolicyDetail({ policy }) {
           <div className="flex flex-wrap gap-2">
             {c.triggers.map((t) => (
               <span key={t.id} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border text-caption ${t.enabled ? 'border-border-strong' : 'border-border-subtle text-text-secondary line-through'}`}>
-                <Icon name={TRIGGER_TARGET[t.target].icon} size={14} />{TRIGGER_SHORT[t.id]}<span className="font-mono text-text-secondary">{t.transport === 'KAFKA' ? 'Kafka' : 'Webhook'}</span>
+                <Icon name={TRIGGER_TARGET[t.target].icon} size={14} />{TRIGGER_SHORT[t.id]}<span className="font-mono text-text-secondary">{transportLabel(t.transport)}</span>
               </span>
             ))}
           </div>

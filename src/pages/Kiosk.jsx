@@ -172,8 +172,11 @@ export default function Kiosk() {
     try {
       const r = await call(kioskEnroll, subject.code, shots.map(({ name, score }) => ({ name, score })), DEVICE_ID);
       if (r.result === 'QUALITY_FAILED') { flash('Ảnh chưa đạt chất lượng', `Điểm thấp nhất ${r.minScore} dưới ngưỡng ${r.min_quality}. Chụp lại.`, 'warn'); setPhase('ready'); setShots([]); return; }
-      if (r.result === 'AUTO_APPROVED') flash('AI đã tự duyệt', `Điểm ${r.score}% đạt ngưỡng ${r.threshold}%. Face ID có hiệu lực ngay.`, 'success');
-      else flash('Đã gửi duyệt', `${r.request_id}: ${r.threshold ? `điểm ${r.score}% dưới ngưỡng tự duyệt ${r.threshold}%` : 'chính sách không bật AI tự duyệt'}, chờ cán bộ duyệt.`, 'info');
+      // Hoàn tất thu thập thì Hệ thống Đào tạo được báo ngay, kể cả khi hiệu lực còn chờ duyệt.
+      const academic = r.events?.some((ev) => ev.trigger_id === 'ACADEMIC_VERIFIED') ? ' Đã báo Hệ thống Đào tạo.' : '';
+      if (r.result === 'AUTO_APPROVED') flash('AI đã tự duyệt', `Điểm ${r.score}% đạt ngưỡng ${r.threshold}%. Face ID có hiệu lực ngay.${academic}`, 'success');
+      else if (r.result === 'UPDATED') flash('Đã cập nhật ảnh', `Mẫu mới ${r.face_profile_id} đã gửi xuống thiết bị.${academic}`, 'success');
+      else flash('Đã gửi duyệt', `${r.request_id}: ${r.threshold ? `điểm ${r.score}% dưới ngưỡng tự duyệt ${r.threshold}%` : 'chính sách không bật AI tự duyệt'}, chờ cán bộ duyệt.${academic}`, 'info');
       reset();
     } catch (e) { flash('Không lưu được', e.message, 'warn'); }
   };

@@ -1,17 +1,43 @@
 import { useState } from 'react';
 import { Banner, Chip, DataBoundary, Empty, Icon, PageHeader, Select, Tabs } from '../components/ui';
 import { useApp } from '../store';
-import { retryEvent, syncSource } from '../api/client';
-import { TRIGGER_TARGET } from '../api/enums';
+import { retryEvent, runContractExpiryCheck, syncSource } from '../api/client';
+import { TRIGGER_SHORT, TRIGGER_TARGET, transportLabel } from '../api/enums';
 import { fmtDateTime, fmtNumber, fmtRelative } from '../lib/format';
 
 const SRC_STATUS = { OK: ['status-active', 'Bình thường'], WARN: ['status-pending', 'Có cảnh báo'], ERROR: ['status-rejected', 'Lỗi đồng bộ'] };
 const EV_STATUS = { DELIVERED: ['status-active', 'Đã gửi'], RETRYING: ['status-pending', 'Đang thử lại'], FAILED: ['status-rejected', 'Thất bại'] };
 const TARGET_OPTIONS = [{ value: 'all', label: 'Mọi hệ thống nhận' }, ...Object.entries(TRIGGER_TARGET).map(([value, m]) => ({ value, label: m.label }))];
 
+/** Hiển thị dữ liệu sự kiện gọn: mẫu khuôn mặt chỉ hiện thông tin mã hóa, không hiện chuỗi mã. */
+function Payload({ p }) {
+  const { template, devices, ...rest } = p;
+  return (
+    <div className="flex flex-col gap-1">
+      <code className="font-mono text-caption text-text-secondary break-all">{JSON.stringify(rest)}</code>
+      {Array.isArray(devices) && <span className="text-caption"><b>{devices.length}</b> thiết bị: <span className="font-mono text-text-secondary">{devices.join(', ') || '—'}</span></span>}
+      {template && (
+        <span className="text-caption flex items-center gap-1 flex-wrap"><Icon name="lock" size={14} className="text-status-active" />Mẫu {template.face_profile_id} • {template.format} • {template.encryption} • <span className="font-mono text-text-secondary">{template.key_id}</span> • {fmtNumber(template.size_bytes)} B</span>
+      )}
+      {template === null && <span className="text-caption flex items-center gap-1"><Icon name="delete" size={14} className="text-status-rejected" />Lệnh xóa mẫu khỏi thiết bị</span>}
+    </div>
+  );
+}
+
 /** Nguồn dữ liệu đầu vào cho Policy Engine và sự kiện gửi ra hệ thống khác (Đặc tả Policy Engine §1 và §3). */
 export default function Integrations() {
-  const { data, call, toast } = useApp();
+  const { data, call, toast, can } = useApp();
+  const job = data.jobs.contract_check;
+  const runCheck = async () => {
+    setBusy('job');
+    try {
+      const r = await call(runContractExpiryCheck);
+      if (r.found.length) toast(`Đã báo ${r.found.length} hợp đồng sắp hết hạn`, r.found.map((f) => `${f.code}: còn ${f.days_left} ngày`).join('; ') + (r.trigger_enabled ? '' : ' (sự kiện đang tắt trong chính sách, không gửi ra ngoài)'), 'success');
+      else toast('Không có trường hợp mới', `Báo trước ${r.notice_days} ngày.${r.already.length ? ` ${r.already.length} hợp đồng đã báo trước đó.` : ''}`, 'info');
+      setTab('out');
+    } catch (e) { toast('Không chạy được', e.message, 'error'); }
+    setBusy(null);
+  };
   const [tab, setTab] = useState('in');
   const [target, setTarget] = useState('all');
   const [busy, setBusy] = useState(null);
@@ -25,7 +51,7 @@ export default function Integrations() {
 
   return (
     <div>
-      <PageHeader title="Nguồn dữ liệu & tích hợp" desc="Hệ thống không tự tạo người, thiết bị hay phòng ban: dữ liệu đến từ các hệ thống nguồn; mọi thay đổi trạng thái được gửi sang hệ thống khác qua Kafka hoặc webhook." />
+      <PageHeader title="Nguồn dữ liệu & tích hợp" desc="Hệ thống không tự tạo người, thiết bị hay phòng ban: dữ liệu đến từ các hệ thống nguồn; mọi thay đổi trạng thái được gửi sang hệ thống khác qua Kafka, RabbitMQ hoặc webhook." />
       <Tabs label="Chiều dữ liệu" className="mb-space-md border-b border-border-subtle" value={tab} onChange={setTab}
         items={[{ key: 'in', label: 'Nguồn đầu vào', count: data.sources.length, tone: data.sources.some((s) => s.status === 'ERROR') ? 'status-rejected' : undefined }, { key: 'out', label: 'Sự kiện gửi đi', count: data.events.length }]} />
 
@@ -51,6 +77,14 @@ export default function Integrations() {
           </div>
         ) : (
           <div className="card overflow-hidden">
+            <div className="p-3 border-b border-border-subtle flex flex-wrap items-center gap-3 bg-surface-container-low">
+              <Icon name="event_repeat" className="text-text-secondary" />
+              <div className="min-w-0">
+                <div className="text-body-sm font-medium">Quét hợp đồng nhà thầu sắp hết hạn <span className="text-caption text-text-secondary font-normal">({job.schedule})</span></div>
+                <div className="text-caption text-text-secondary">Lần chạy cuối {fmtRelative(job.last_run)}: {job.last_result}</div>
+              </div>
+              {can('policy_write') && <button className="btn-outline btn-sm ml-auto" disabled={busy === 'job'} onClick={runCheck}><Icon name="play_arrow" size={16} />{busy === 'job' ? 'Đang quét' : 'Chạy ngay'}</button>}
+            </div>
             <div className="p-3 border-b border-border-subtle flex items-center gap-2">
               <Select className="!w-[240px]" label="Hệ thống nhận" value={target} options={TARGET_OPTIONS} onChange={setTarget} />
               <span className="text-caption text-text-secondary ml-auto">Bật, tắt từng loại sự kiện trong bước 4 của Chính sách sinh trắc.</span>
@@ -63,10 +97,10 @@ export default function Integrations() {
                   {events.map((e) => (
                     <tr key={e.event_id} className="align-top">
                       <td className="whitespace-nowrap"><div>{fmtDateTime(e.at)}</div><div className="font-mono text-caption text-text-secondary">{e.event_id}</div></td>
-                      <td className="whitespace-nowrap"><span className="flex items-center gap-1.5"><Icon name={TRIGGER_TARGET[e.target].icon} size={16} />{TRIGGER_TARGET[e.target].label}</span><span className="font-mono text-caption text-text-secondary">{e.trigger_id}</span></td>
-                      <td className="whitespace-nowrap"><div>{e.transport === 'KAFKA' ? 'Kafka' : 'Webhook'}</div><div className="font-mono text-caption text-text-secondary max-w-[220px] truncate" title={e.destination}>{e.destination}</div></td>
+                      <td className="whitespace-nowrap"><span className="flex items-center gap-1.5"><Icon name={TRIGGER_TARGET[e.target].icon} size={16} />{TRIGGER_TARGET[e.target].label}</span><span className="text-caption text-text-secondary">{TRIGGER_SHORT[e.trigger_id] || e.trigger_id}</span></td>
+                      <td className="whitespace-nowrap"><div>{transportLabel(e.transport)}</div><div className="font-mono text-caption text-text-secondary max-w-[220px] truncate" title={e.destination}>{e.destination}</div></td>
                       <td className="font-mono text-caption whitespace-nowrap">{e.ref}</td>
-                      <td><code className="font-mono text-caption text-text-secondary break-all">{JSON.stringify(e.payload)}</code></td>
+                      <td><Payload p={e.payload} /></td>
                       <td className="whitespace-nowrap">
                         <Chip color={EV_STATUS[e.status][0]}>{EV_STATUS[e.status][1]}</Chip>
                         {e.error && <p className="text-caption text-status-pending mt-1 max-w-[220px] whitespace-normal">{e.error}</p>}

@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Banner, Chip, ChipToggleGroup, FieldError, Icon, Modal, Select, Switch, SourceBadge } from '../components/ui';
+import { Banner, Chip, ChipToggleGroup, Combobox, FieldError, Icon, Modal, Select, Switch, SourceBadge } from '../components/ui';
 import { useApp } from '../store';
 import { dryRunPolicy, savePolicy } from '../api/client';
-import { ORG_TREE } from '../api/db';
-import { SOURCE, SUBJECT_TYPE, TRIGGER_EVENT, TRIGGER_SHORT, TRIGGER_TARGET } from '../api/enums';
+import { orgTreeLive, spacesLive } from '../api/client';
+import { SOURCE, SUBJECT_TYPE, TRANSPORT, TRIGGER_EVENT, TRIGGER_SHORT, TRIGGER_TARGET } from '../api/enums';
 import { SOURCE_ALLOWED, TIME_PRESETS, diffConfig, stepOfError, validateOwnership, validatePolicy } from '../api/policyValidation';
-import { SPACE_TREE, DEVICES } from '../data/mock';
+import { DEVICES } from '../data/mock';
 import { fmtNumber, fmtRelative } from '../lib/format';
 import { APPROVER_ROLES, DAYS, RESCAN_CHANNELS, fieldLabel, valueText } from '../lib/policyText';
 
@@ -116,7 +116,7 @@ export default function PolicyEditor() {
         {step === 1 && <Step1 cfg={cfg} update={update} err={err} policy={policy} />}
         {step === 2 && <Step2 cfg={cfg} update={update} err={err} sources={data.sources} />}
         {step === 3 && <Step3 cfg={cfg} update={update} err={err} />}
-        {step === 4 && <Step4 cfg={cfg} update={update} err={err} />}
+        {step === 4 && <Step4 cfg={cfg} update={update} err={err} policies={data.policies} />}
         {step === 5 && <Step5 cfg={cfg} base={base} policy={policy} changes={changes} errors={errors} reason={reason} setReason={setReason} dry={dry} runDry={runDry} busy={busy} go={go} nextVersion={nextVersion} />}
       </section>
 
@@ -148,9 +148,19 @@ const Section = ({ title, hint, children, error }) => (
 );
 
 // ---------- Bước 1 ----------
+const flatTree = (nodes, path = []) => nodes.flatMap((n) => [{ node: n, path }, ...(n.children ? flatTree(n.children, [...path, n]) : [])]);
+
 function OrgTree({ value, onChange, invalid }) {
+  const tree = orgTreeLive();
   const toggle = (id) => onChange(value.includes(id) ? value.filter((x) => x !== id) : id === 'ALL' ? ['ALL'] : [...value.filter((x) => x !== 'ALL'), id]);
-  const render = (nodes, depth, parentOn) => nodes.map((n) => {
+  // Đơn vị đã nằm dưới một đơn vị cha được chọn thì không cần chọn riêng.
+  const covered = (path) => path.some((p) => value.includes(p.id));
+  const options = flatTree(tree).filter(({ node }) => !node.inactive).map(({ node, path }) => ({
+    value: node.id, label: node.name, group: path.slice(1).map((p) => p.name).join(' › ') || undefined,
+    picked: value.includes(node.id) || covered(path), disabled: covered(path),
+    hint: covered(path) ? 'Đã gồm theo đơn vị cha' : node.source === 'HR' ? 'Đồng bộ từ Nhân sự' : undefined,
+  }));
+  const render = (nodes, depth, parentOn) => nodes.filter((n) => !n.inactive || value.includes(n.id)).map((n) => {
     const on = value.includes(n.id);
     const inherited = parentOn && !on;
     return (
@@ -165,7 +175,25 @@ function OrgTree({ value, onChange, invalid }) {
       </li>
     );
   });
-  return <ul className={`max-h-[340px] overflow-y-auto rounded border p-1 ${invalid ? 'border-status-rejected' : 'border-border-control'}`} aria-label="Cây tổ chức">{render(ORG_TREE, 0, false)}</ul>;
+  return (
+    <>
+      <Combobox label="Tìm đơn vị" placeholder="Tìm khoa, phòng… (gõ “cntt”, “dao tao”)" options={options} onPick={toggle} />
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-1.5" aria-label="Đơn vị đã chọn">
+          {value.map((id) => {
+            const hit = flatTree(tree).find((x) => x.node.id === id);
+            return (
+              <span key={id} className="inline-flex items-center gap-1 h-7 pl-2 pr-1 rounded border border-primary-container bg-primary-fixed text-primary-container text-caption">
+                {hit?.node.name || id}{hit?.node.inactive && ' (ngừng dùng)'}
+                <button type="button" aria-label={`Bỏ ${hit?.node.name || id}`} className="w-5 h-5 rounded flex items-center justify-center hover:bg-primary-container/10" onClick={() => toggle(id)}><Icon name="close" size={14} /></button>
+              </span>
+            );
+          })}
+        </div>
+      )}
+      <ul className={`max-h-[300px] overflow-y-auto rounded border p-1 ${invalid ? 'border-status-rejected' : 'border-border-control'}`} aria-label="Cây tổ chức">{render(tree, 0, false)}</ul>
+    </>
+  );
 }
 
 function Step1({ cfg, update, err, policy }) {
@@ -193,6 +221,13 @@ function Step2({ cfg, update, err, sources }) {
   const zones = cfg.spatial.zones;
   const tw = cfg.spatial.time_window;
   const toggleZone = (id) => update('spatial.zones')(zones.includes(id) ? zones.filter((z) => z !== id) : [...zones, id]);
+  // Gõ mã phòng, tên phòng hoặc mã thiết bị (vd. “TS_A100”) đều tìm ra khu vực chứa nó.
+  const SPACE_TREE = spacesLive();
+  const zoneOptions = SPACE_TREE.flatMap((b) => b.children.flatMap((f) => f.children.map((r) => ({
+    value: r.id, label: `${r.name}`, group: `${b.name} › ${f.name}`, picked: zones.includes(r.id),
+    disabled: !r.approved && !zones.includes(r.id),
+    hint: [ZONE_LABEL[r.zone], !r.approved && 'chưa duyệt hạ tầng', r.devices.join(', ')].filter(Boolean).join(' • '),
+  }))));
   const picked = SPACE_TREE.flatMap((b) => b.children.flatMap((f) => f.children)).filter((r) => zones.includes(r.id));
   const devices = picked.flatMap((r) => r.devices.map((id) => ({ ...DEVICES.find((d) => d.id === id), room: r.id }))).filter((d) => d.id);
   const src = { TIMETABLE: sources.find((s) => s.id === 'EMS'), SHIFT: sources.find((s) => s.id === 'TIMEKEEPING') }[tw.preset];
@@ -202,6 +237,7 @@ function Step2({ cfg, update, err, sources }) {
   return (
     <div className="grid grid-cols-2 gap-space-xl">
       <Section title="Khu vực kiểm soát" hint="Chỉ khu vực đã duyệt hạ tầng mới nhận dữ liệu khuôn mặt." error={err('spatial.zones')}>
+        <Combobox label="Tìm khu vực" placeholder="Tìm phòng hoặc thiết bị (vd. “C30”, “cong chinh”, “TS_A100”)" options={zoneOptions} onPick={toggleZone} />
         <div className={`max-h-[300px] overflow-y-auto rounded border p-1 ${err('spatial.zones') ? 'border-status-rejected' : 'border-border-control'}`}>
           {SPACE_TREE.map((b) => (
             <div key={b.id}>
@@ -329,8 +365,9 @@ function Step3({ cfg, update, err }) {
 }
 
 // ---------- Bước 4 ----------
-function Step4({ cfg, update, err }) {
+function Step4({ cfg, update, err, policies }) {
   const chain = cfg.workflow.approval_chain;
+  const knownDest = Object.fromEntries(Object.keys(TRANSPORT).map((k) => [k, [...new Set(policies.flatMap((p) => p.versions.flatMap((v) => v.config.triggers)).filter((t) => t.transport === k).map((t) => t.destination))]]));
   const setChain = update('workflow.approval_chain');
   const move = (i, d) => { const c = [...chain]; [c[i], c[i + d]] = [c[i + d], c[i]]; setChain(c); };
   const setStep = (i, role) => setChain(chain.map((s, j) => (j === i ? { ...s, role, label: APPROVER_ROLES[role] } : s)));
@@ -366,10 +403,13 @@ function Step4({ cfg, update, err }) {
         <div className="flex gap-space-xl items-start">
           <label className="flex items-center gap-3"><Switch checked={cfg.workflow.revoke_two_person} onChange={update('workflow.revoke_two_person')} label="Thu hồi cần 2 người xác nhận" /><span className="text-body-sm">Thu hồi quyền cần 2 cán bộ khác nhau xác nhận</span></label>
           <NumberField id="retention" label="Xóa dữ liệu sau khi rút đồng ý trong" value={cfg.workflow.retention_days_after_withdraw} onChange={update('workflow.retention_days_after_withdraw')} min={0} max={30} suffix="ngày" error={err('workflow.retention_days_after_withdraw')} />
+          {cfg.scope.subject_types.includes('CONTRACTOR') && (
+            <NumberField id="contract_notice" label="Báo hợp đồng nhà thầu sắp hết hạn trước" value={cfg.workflow.contract_notice_days ?? 14} onChange={update('workflow.contract_notice_days')} min={1} max={90} suffix="ngày" error={err('workflow.contract_notice_days')} />
+          )}
         </div>
       </Section>
 
-      <Section title="Sự kiện gửi sang hệ thống khác" hint="Gửi qua hàng đợi Kafka hoặc webhook mỗi khi sự kiện xảy ra. Tắt một dòng nghĩa là hệ thống kia không nhận sự kiện đó.">
+      <Section title="Sự kiện gửi sang hệ thống khác" hint="Gửi qua Kafka, RabbitMQ hoặc webhook mỗi khi sự kiện xảy ra. Tắt một dòng nghĩa là hệ thống kia không nhận sự kiện đó.">
         <div className="overflow-x-auto rounded border border-border-subtle">
           <table className="data-table">
             <thead><tr><th>Gửi tới</th><th>Khi nào</th><th>Cách gửi</th><th className="min-w-[280px]">Địa chỉ / topic</th><th>Dữ liệu gửi</th><th>Bật</th></tr></thead>
@@ -380,8 +420,9 @@ function Step4({ cfg, update, err }) {
                   <tr key={t.id} className={`align-top ${e ? 'bg-status-rejected/5' : ''}`}>
                     <td className="whitespace-nowrap"><span className="flex items-center gap-1.5 font-medium"><Icon name={TRIGGER_TARGET[t.target].icon} size={16} />{TRIGGER_TARGET[t.target].label}</span><span className="text-caption text-text-secondary">{TRIGGER_SHORT[t.id]}</span></td>
                     <td className="min-w-[200px] text-body-sm">{TRIGGER_EVENT[t.event]}</td>
-                    <td><Select className="!w-[130px]" label={`Cách gửi ${t.id}`} value={t.transport} options={[{ value: 'KAFKA', label: 'Kafka' }, { value: 'WEBHOOK', label: 'Webhook' }]} onChange={(v) => setTrigger(i, { transport: v })} /></td>
-                    <td><input className={`input font-mono !text-caption ${e ? '!border-status-rejected' : ''}`} aria-label={`Địa chỉ ${t.id}`} value={t.destination} onChange={(ev) => setTrigger(i, { destination: ev.target.value })} /><FieldError msg={e} /></td>
+                    <td><Select className="!w-[130px]" label={`Cách gửi ${t.id}`} value={t.transport} options={Object.entries(TRANSPORT).map(([value, m]) => ({ value, label: m.label }))} onChange={(v) => setTrigger(i, { transport: v })} /></td>
+                    <td><input className={`input font-mono !text-caption ${e ? '!border-status-rejected' : ''}`} aria-label={`Địa chỉ ${t.id}`} list={`dest-${t.transport}`} placeholder={TRANSPORT[t.transport]?.placeholder} value={t.destination} onChange={(ev) => setTrigger(i, { destination: ev.target.value })} />
+                      <p className="mt-0.5 text-caption text-text-secondary">{TRANSPORT[t.transport]?.dest}</p><FieldError msg={e} /></td>
                     <td className="text-caption text-text-secondary min-w-[160px]">{t.payload.join(', ')}</td>
                     <td><Switch checked={t.enabled} onChange={(v) => setTrigger(i, { enabled: v })} label={`Bật ${t.id}`} /></td>
                   </tr>
@@ -390,6 +431,10 @@ function Step4({ cfg, update, err }) {
             </tbody>
           </table>
         </div>
+        {/* Gợi ý địa chỉ đã dùng ở mọi chính sách, theo từng kênh, để khỏi gõ sai tên topic hay URL. */}
+        {Object.keys(TRANSPORT).map((k) => (
+          <datalist key={k} id={`dest-${k}`}>{knownDest[k].map((d) => <option key={d} value={d} />)}</datalist>
+        ))}
       </Section>
     </div>
   );

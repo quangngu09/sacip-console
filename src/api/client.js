@@ -43,6 +43,10 @@ const db = {
   anomalies: clone(seed.ANOMALIES),
   auditMetrics: clone(seed.AUDIT_METRICS),
   notifications: clone(seed.NOTIFICATIONS),
+  orgTree: clone(seed.ORG_TREE),
+  spaces: clone(SPACE_TREE),
+  hrPendingUnits: clone(seed.HR_PENDING_UNITS),
+  jobs: clone(seed.JOBS),
   audit: [],
 };
 let seq = { log: 90410, req: 8842, evt: 55214 };
@@ -87,7 +91,7 @@ export const policyFor = (type) => {
   const p = policyOf(type);
   return p ? { policy_id: p.policy_id, name: p.name, version: p.current_version, config: clone(activeConfig(p)) } : null;
 };
-const rooms = () => SPACE_TREE.flatMap((b) => b.children.flatMap((f) => f.children));
+const rooms = () => db.spaces.flatMap((b) => b.children.flatMap((f) => f.children));
 
 function emit(type, triggerId, ref, payload) {
   const p = policyOf(type);
@@ -98,12 +102,40 @@ function emit(type, triggerId, ref, payload) {
   return ev;
 }
 
+// Khóa mã hóa mẫu khuôn mặt do KMS quản lý, xoay vòng hằng tháng. Thiết bị chỉ giữ khóa giải mã, Console không thấy mẫu thô.
+const TEMPLATE_KEY = 'kms://sacip/face-template/2026-11';
+const FACE_DEVICE = /^(CAM|TS|EDGE)_/;
+
+/**
+ * Trigger B (Đặc tả Policy Engine §3): gửi mẫu khuôn mặt đã mã hóa xuống đúng thiết bị trong các khu vực của chính sách.
+ * Hồ sơ hết hiệu lực thì gửi lệnh xóa mẫu khỏi thiết bị thay cho mẫu.
+ */
 function accessPayload(s) {
   const p = policyOf(s.subject_type);
   const zones = p ? activeConfig(p).spatial.zones : [];
-  const devices = rooms().filter((r) => zones.includes(r.id)).flatMap((r) => r.devices).length;
-  return { subject_id: s.subject_id, validity: s.states.validity, zones, devices };
+  // Chỉ thiết bị nhận diện (camera AI, cổng xoay, máy xử lý biên) giữ mẫu; Wi-Fi AP, beacon, kiosk thì không.
+  const devices = rooms().filter((r) => zones.includes(r.id)).flatMap((r) => r.devices).filter((id) => FACE_DEVICE.test(id));
+  const live = ['ACTIVE', 'EXPIRING'].includes(s.states.validity) && s.face_profile_id;
+  const base = { subject_id: s.subject_id, validity: s.states.validity, operation: live ? 'UPSERT_TEMPLATE' : 'DELETE_TEMPLATE', zones, devices };
+  if (!live) return { ...base, template: null };
+  const cipher = (hash(`${s.face_profile_id}|${TEMPLATE_KEY}|a`) + hash(`${s.face_profile_id}|${TEMPLATE_KEY}|b`)).slice(0, 40);
+  return { ...base, template: { face_profile_id: s.face_profile_id, format: 'ArcFace-512d', encryption: 'AES-256-GCM', key_id: TEMPLATE_KEY, ciphertext: `${cipher}…`, size_bytes: 2048, checksum: hash(cipher).slice(0, 16) } };
 }
+
+/** Trigger A: báo Hệ thống Đào tạo khi sinh viên có Face ID hoàn chỉnh. Mỗi phiên bản mẫu chỉ báo một lần. */
+function notifyAcademic(s, ref) {
+  if (s.subject_type !== 'STUDENT' || s.states.collection !== 'COMPLETED' || !s.face_profile_id) return null;
+  if (s.academic_sent_for === s.face_profile_id) return null;
+  const ev = emit('STUDENT', 'ACADEMIC_VERIFIED', ref, { student_code: s.code, face_profile_id: s.face_profile_id, status: 'VERIFIED' });
+  if (ev) s.academic_sent_for = s.face_profile_id;
+  return ev;
+}
+
+const dayDiff = (ddmmyyyy) => {
+  const [d, m, y] = ddmmyyyy.split('/').map(Number);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return Math.round((new Date(y, m - 1, d) - today) / 86400000);
+};
 
 const requireConsent = (s, what) => {
   if (s.states.consent !== 'ACTIVE') throw new ApiError(`${s.name} chưa có xác nhận đồng ý hợp lệ nên không thể ${what}.`);
@@ -216,7 +248,7 @@ function finalize(r, s, note) {
     events.push(emit(s.subject_type, 'NOTIFY_RESCAN', r.request_id, { subject_id: s.subject_id, decision: 'APPROVED', rescan_channels: cfg.biometric.rescan_channels, rescan_expires_at: exp, uses: cfg.biometric.rescan_max_uses }));
   } else if (r.request_type === 'NEW_REGISTRATION') {
     s.states.request = 'NONE'; s.states.collection = 'COMPLETED'; s.states.validity = 'ACTIVE'; s.valid_until ||= '30/06/2027';
-    if (s.subject_type === 'STUDENT') events.push(emit('STUDENT', 'ACADEMIC_VERIFIED', r.request_id, { student_code: s.code, face_profile_id: s.face_profile_id, status: 'VERIFIED' }));
+    events.push(notifyAcademic(s, r.request_id));
     events.push(emit(s.subject_type, 'ACCESS_SYNC', s.code, accessPayload(s)));
   } else if (r.request_type === 'REVOKE') {
     s.states.request = 'NONE'; s.states.validity = 'REVOKED';
@@ -448,24 +480,267 @@ export async function kioskEnroll(code, poses, deviceId) {
   if (poses.length < cfg.pose_count) throw new ApiError(`Chính sách yêu cầu ${cfg.pose_count} tư thế, mới chụp ${poses.length}.`);
   const minScore = Math.min(...poses.map((x) => x.score));
   const avg = Math.round(poses.reduce((a, x) => a + x.score, 0) / poses.length);
-  Object.assign(s, { source: 'COUNTER', poses, ai_score: avg, face_profile_id: s.face_profile_id || `fp_${s.code.slice(-4)}_v1` });
+  // Chụp lại thì tạo phiên bản mẫu mới, để hệ thống nhận biết mẫu cũ đã bị thay.
+  const rescan = s.states.request === 'RESCAN_GRANTED' && s.face_profile_id;
+  const fp = rescan ? s.face_profile_id.replace(/_v(\d+)$/, (_, n) => `_v${Number(n) + 1}`) : s.face_profile_id || `fp_${s.code.slice(-4)}_v1`;
+  Object.assign(s, { source: 'COUNTER', poses, ai_score: avg, face_profile_id: fp });
   appendAudit({ action_code: 'KIOSK_CAPTURE', target: s.code, detail: `${deviceId}: ${poses.length} tư thế, điểm thấp nhất ${minScore}` });
+  const events = [];
+  // Ảnh kém hẳn ngưỡng thường là che mặt hoặc giơ ảnh in: gắn cờ để an ninh xem, không tự khóa hay từ chối.
+  if (minScore < cfg.min_quality - 15) events.push(raiseRisk(s, 'WATCH', `Điểm chất lượng ${minScore} tại ${deviceId}, thấp hơn ngưỡng ${cfg.min_quality} quá 15 điểm`, AI_ENGINE));
   if (minScore < cfg.min_quality) {
     s.states.collection = 'QUALITY_FAILED';
-    return { result: 'QUALITY_FAILED', min_quality: cfg.min_quality, minScore };
+    return { result: 'QUALITY_FAILED', min_quality: cfg.min_quality, minScore, events: events.filter(Boolean) };
   }
   s.states.collection = 'COMPLETED';
-  if (s.states.request === 'RESCAN_GRANTED') s.states.request = 'NONE';
+  if (s.states.request === 'RESCAN_GRANTED') { s.states.request = 'NONE'; s.rescan_grant = null; }
+  // Trigger A bắn ngay khi thu thập hoàn tất, không chờ duyệt hiệu lực (Đặc tả Policy Engine §3).
+  events.push(notifyAcademic(s, s.code));
   if (cfg.ai_auto_approve_enabled && avg >= cfg.ai_auto_approve_threshold) {
     s.states.validity = 'ACTIVE'; s.valid_until ||= '30/06/2027';
-    appendAudit({ action_code: 'AUTO_APPROVE_FACE_ID', target: s.code, detail: `Điểm ${avg}% ≥ ngưỡng ${cfg.ai_auto_approve_threshold}% (${p.policy_id} ${p.current_version})`, by: { id: 'AI-ENGINE', name: 'AI-ENGINE v4.1', ip: '10.20.0.31' } });
-    if (s.subject_type === 'STUDENT') emit('STUDENT', 'ACADEMIC_VERIFIED', s.code, { student_code: s.code, face_profile_id: s.face_profile_id, status: 'VERIFIED' });
-    emit(s.subject_type, 'ACCESS_SYNC', s.code, accessPayload(s));
-    return { result: 'AUTO_APPROVED', score: avg, threshold: cfg.ai_auto_approve_threshold };
+    appendAudit({ action_code: 'AUTO_APPROVE_FACE_ID', target: s.code, detail: `Điểm ${avg}% ≥ ngưỡng ${cfg.ai_auto_approve_threshold}% (${p.policy_id} ${p.current_version})`, by: AI_ENGINE });
+    events.push(emit(s.subject_type, 'ACCESS_SYNC', s.code, accessPayload(s)));
+    return { result: 'AUTO_APPROVED', score: avg, threshold: cfg.ai_auto_approve_threshold, face_profile_id: fp, events: events.filter(Boolean) };
+  }
+  // Đã có mẫu đang hiệu lực (chụp lại) thì mẫu mới thay ngay trên thiết bị; hồ sơ mới thì chờ duyệt.
+  if (['ACTIVE', 'EXPIRING'].includes(s.states.validity)) {
+    events.push(emit(s.subject_type, 'ACCESS_SYNC', s.code, accessPayload(s)));
+    return { result: 'UPDATED', score: avg, face_profile_id: fp, events: events.filter(Boolean) };
   }
   s.states.validity = 'PENDING_ACTIVATION';
   const r = db.requests.find((x) => x.subject_id === s.subject_id && x.status === 'pending' && x.request_type === 'NEW_REGISTRATION') || openRequest(s, 'NEW_REGISTRATION', `Đăng ký tại quầy ${deviceId}, ${poses.length} tư thế.`, 'COUNTER');
-  return { result: 'PENDING_REVIEW', score: avg, threshold: cfg.ai_auto_approve_enabled ? cfg.ai_auto_approve_threshold : null, request_id: r.request_id };
+  return { result: 'PENDING_REVIEW', score: avg, threshold: cfg.ai_auto_approve_enabled ? cfg.ai_auto_approve_threshold : null, request_id: r.request_id, face_profile_id: fp, events: events.filter(Boolean) };
+}
+
+// ---------- Rủi ro ----------
+const AI_ENGINE = { id: 'AI-ENGINE', name: 'AI-ENGINE v4.1', ip: '10.20.0.31' };
+const RISK_RANK = { NONE: 0, WATCH: 1, HIGH: 2 };
+
+function raiseRisk(s, level, flag, by = actor) {
+  s.risk_flags = [...(s.risk_flags || []), flag];
+  if (RISK_RANK[level] > RISK_RANK[s.states.risk]) s.states.risk = level;
+  appendAudit({ action_code: 'RISK_FLAGGED', target: s.code, detail: `${level}: ${flag}`, by });
+  return emit(s.subject_type, 'NOTIFY_RISK', s.code, { subject_id: s.subject_id, risk_level: s.states.risk, risk_flags: s.risk_flags });
+}
+
+/** POST /subjects/{id}/risk  body: { level: WATCH|HIGH, flag } → gắn cờ, báo an ninh. Không tự khóa: người trực quyết định. */
+export async function flagRisk(subjectId, level, flag) {
+  await wait();
+  if (!flag || flag.trim().length < 10) throw new ApiError('Mô tả dấu hiệu rủi ro tối thiểu 10 ký tự.', { flag: 'Tối thiểu 10 ký tự.' });
+  return { event: raiseRisk(subjectById(subjectId), level, flag.trim()) };
+}
+
+/** POST /subjects/{id}/risk/clear  body: { reason } */
+export async function clearRisk(subjectId, reason) {
+  await wait();
+  const s = subjectById(subjectId);
+  if (s.states.risk === 'NONE') throw new ApiError(`${s.name} không có cờ rủi ro.`);
+  s.states.risk = 'NONE'; s.risk_flags = [];
+  appendAudit({ action_code: 'RISK_CLEARED', target: s.code, detail: reason });
+  return clone(s);
+}
+
+// ---------- Tác vụ định kỳ ----------
+/**
+ * POST /jobs/contract-check/run — quét nhà thầu có hợp đồng sắp hết hạn trong số ngày báo trước của chính sách
+ * rồi bắn NOTIFY_CONTRACT. Mỗi mốc hết hạn chỉ báo một lần; gia hạn hợp đồng thì mốc mới được báo lại.
+ */
+export async function runContractExpiryCheck() {
+  await wait(600);
+  const p = policyOf('CONTRACTOR');
+  const cfg = activeConfig(p);
+  const notice = cfg.workflow.contract_notice_days ?? 14;
+  const found = []; const already = []; const events = [];
+  db.subjects.filter((s) => s.subject_type === 'CONTRACTOR' && s.context?.contract_until && !['REVOKED'].includes(s.states.validity)).forEach((s) => {
+    const left = dayDiff(s.context.contract_until);
+    if (left < 0 || left > notice) return;
+    if (s.contract_notified_for === s.context.contract_until) { already.push({ code: s.code, days_left: left }); return; }
+    const ev = emit('CONTRACTOR', 'NOTIFY_CONTRACT', s.code, { subject_id: s.subject_id, contract_no: s.context.contract_no, contract_until: s.context.contract_until, days_left: left });
+    s.contract_notified_for = s.context.contract_until;
+    if (s.states.validity === 'ACTIVE') s.states.validity = 'EXPIRING';
+    found.push({ code: s.code, name: s.name, days_left: left });
+    if (ev) events.push(ev);
+  });
+  const result = found.length ? `${found.length} nhà thầu mới vào diện sắp hết hạn, đã gửi thông báo` : already.length ? `Không có trường hợp mới (${already.length} đã báo trước đó)` : 'Không có hợp đồng nào sắp hết hạn';
+  db.jobs.contract_check = { ...db.jobs.contract_check, last_run: iso(), last_result: result };
+  appendAudit({ action_code: 'JOB_CONTRACT_CHECK', target: p.policy_id, detail: `Báo trước ${notice} ngày: ${result}` });
+  return { notice_days: notice, found, already, events, trigger_enabled: !!activeConfig(p).triggers.find((t) => t.id === 'NOTIFY_CONTRACT')?.enabled };
+}
+
+// ---------- Không gian & khu vực ----------
+/** Cây Tòa → Tầng → Phòng đang dùng (đọc trực tiếp) cho wizard chính sách và gửi mẫu xuống thiết bị. */
+export const spacesLive = () => db.spaces;
+const ZONES = ['Public', 'Operational', 'Restricted', 'Forbidden'];
+const ROOM_CODE_RE = /^[A-Z]\d{3,4}$/;
+const findRoom = (id) => {
+  for (const b of db.spaces) for (const f of b.children) { const r = f.children.find((x) => x.id === id); if (r) return { b, f, r }; }
+  return null;
+};
+
+/** Gợi ý mã phòng tiếp theo trên một tầng, ví dụ Tòa C tầng 3 đã có C301, C302, C305 thì gợi ý C306. */
+export function suggestRoomCode(buildingId, floorNo) {
+  const n = Number(floorNo);
+  if (!buildingId || !Number.isInteger(n) || n < 1) return '';
+  const used = rooms().map((r) => r.id).filter((id) => id.startsWith(`${buildingId}${n}`)).map((id) => Number(id.slice(String(n).length + 1)));
+  const next = used.length ? Math.max(...used) + 1 : 1;
+  return `${buildingId}${n}${String(next).padStart(2, '0')}`;
+}
+
+/**
+ * POST /spaces/rooms  body: { building: {id} | {new_id, new_name}, floor_no, code, name, zone, reason }
+ * Khu vực mới luôn ở trạng thái “Chờ duyệt hạ tầng”: chưa gán thiết bị, chưa phát QR, chưa chọn được trong chính sách.
+ */
+export async function createRoom(input) {
+  await wait();
+  const f = {};
+  let b = null;
+  if (input.building?.id) b = db.spaces.find((x) => x.id === input.building.id);
+  else {
+    const id = String(input.building?.new_id || '').trim().toUpperCase();
+    if (!/^[A-Z]$/.test(id)) f.building_id = 'Mã tòa là một chữ cái in hoa, ví dụ D.';
+    else if (db.spaces.some((x) => x.id === id)) f.building_id = `Tòa ${id} đã có.`;
+    if (!input.building?.new_name || input.building.new_name.trim().length < 3) f.building_name = 'Tên tòa tối thiểu 3 ký tự.';
+  }
+  if (input.building?.id && !b) f.building = 'Chọn tòa nhà.';
+  const floorNo = Number(input.floor_no);
+  if (!Number.isInteger(floorNo) || floorNo < 1 || floorNo > 30) f.floor_no = 'Tầng từ 1 đến 30.';
+  const bid = b ? b.id : String(input.building?.new_id || '').trim().toUpperCase();
+  const code = String(input.code || '').trim().toUpperCase();
+  if (!ROOM_CODE_RE.test(code)) f.code = 'Mã phòng gồm mã tòa và 3–4 chữ số, ví dụ C306.';
+  else if (findRoom(code)) f.code = `Mã ${code} đã tồn tại.`;
+  else if (bid && !code.startsWith(bid)) f.code = `Mã phòng phải bắt đầu bằng mã tòa ${bid}.`;
+  else if (!f.floor_no && !code.slice(1).startsWith(String(floorNo))) f.code = `Phòng ở tầng ${floorNo} nên mã bắt đầu bằng ${bid}${floorNo}.`;
+  if (!input.name || input.name.trim().length < 3) f.name = 'Tên khu vực tối thiểu 3 ký tự.';
+  if (!ZONES.includes(input.zone)) f.zone = 'Chọn loại khu vực.';
+  if (!input.reason || input.reason.trim().length < 10) f.reason = 'Ghi căn cứ khai báo, tối thiểu 10 ký tự.';
+  if (Object.keys(f).length) throw new ApiError('Thông tin khu vực chưa hợp lệ.', f);
+
+  if (!b) { b = { id: bid, name: input.building.new_name.trim(), type: 'building', children: [] }; db.spaces.push(b); }
+  let floor = b.children.find((x) => x.id === `${b.id}-${floorNo}`);
+  if (!floor) {
+    floor = { id: `${b.id}-${floorNo}`, name: `Tầng ${floorNo}`, type: 'floor', children: [] };
+    b.children.push(floor);
+    b.children.sort((x, y) => Number(x.id.split('-')[1]) - Number(y.id.split('-')[1]));
+  }
+  const room = { id: code, name: input.name.trim(), type: 'room', zone: input.zone, approved: false, devices: [], created_at: iso(), created_by: actor.name };
+  floor.children.push(room);
+  floor.children.sort((x, y) => x.id.localeCompare(y.id));
+  appendAudit({ action_code: 'SPACE_CREATED', target: code, detail: `${room.name} (${b.name} › ${floor.name}), loại ${input.zone}. ${input.reason.trim()}` });
+  return { room: clone(room), building_id: b.id, floor_id: floor.id };
+}
+
+/** POST /spaces/rooms/{id}/approve  body: { reason } */
+export async function approveRoom(id, reason) {
+  await wait();
+  const hit = findRoom(id);
+  if (hit.r.approved) throw new ApiError(`${id} đã được duyệt.`);
+  hit.r.approved = true;
+  appendAudit({ action_code: 'SPACE_APPROVED', target: id, detail: reason });
+  return clone(hit.r);
+}
+
+/** PATCH /spaces/rooms/{id}  body: { zone, reason } */
+export async function setRoomZone(id, zone, reason) {
+  await wait();
+  const hit = findRoom(id);
+  const from = hit.r.zone;
+  hit.r.zone = zone;
+  appendAudit({ action_code: 'SPACE_ZONE_CHANGED', target: id, detail: `${from} → ${zone}. ${reason}` });
+  return clone(hit.r);
+}
+
+/** POST /spaces/rooms/{id}/devices  body: { device_id } | DELETE /spaces/rooms/{id}/devices/{device_id} */
+export async function assignDevice(roomId, deviceId, attach = true) {
+  await wait(150);
+  const hit = findRoom(roomId);
+  if (attach) {
+    if (!hit.r.approved) throw new ApiError('Phòng chưa được duyệt hạ tầng.');
+    if (rooms().some((r) => r.devices.includes(deviceId))) throw new ApiError(`${deviceId} đang gắn với phòng khác.`);
+    hit.r.devices.push(deviceId);
+  } else hit.r.devices = hit.r.devices.filter((x) => x !== deviceId);
+  appendAudit({ action_code: attach ? 'DEVICE_ASSIGNED' : 'DEVICE_UNASSIGNED', target: roomId, detail: deviceId });
+  return clone(hit.r);
+}
+
+// ---------- Đơn vị tổ chức ----------
+const flatUnits = (nodes, parent = null) => nodes.flatMap((n) => [{ node: n, parent }, ...(n.children ? flatUnits(n.children, n) : [])]);
+const findUnit = (id) => flatUnits(db.orgTree).find((x) => x.node.id === id);
+/** Cây đơn vị đang dùng (đọc trực tiếp, không sao chép) cho tra tên đơn vị ở mọi trang. */
+export const orgTreeLive = () => db.orgTree;
+
+const unitIdsUnder = (node) => [node.id, ...(node.children || []).flatMap(unitIdsUnder)];
+/** Những gì đang tham chiếu tới đơn vị: hồ sơ và chính sách. Dùng để chặn ngừng dùng đơn vị còn người. */
+export function unitUsage(id) {
+  const hit = findUnit(id);
+  if (!hit) return { subjects: 0, policies: [] };
+  const ids = unitIdsUnder(hit.node);
+  return {
+    subjects: db.subjects.filter((s) => ids.includes(s.org_unit)).length,
+    policies: db.policies.filter((p) => activeConfig(p).scope.org_units.some((u) => ids.includes(u))).map((p) => p.policy_id),
+  };
+}
+
+const UNIT_ID_RE = /^[A-Z][A-Z0-9_]{1,15}$/;
+
+/** POST /org-units  body: { parent_id, id, name } */
+export async function createOrgUnit(parentId, id, name) {
+  await wait();
+  const fields = {};
+  const code = String(id || '').trim().toUpperCase();
+  if (!UNIT_ID_RE.test(code)) fields.id = 'Mã gồm 2–16 ký tự in hoa, số hoặc gạch dưới, bắt đầu bằng chữ.';
+  else if (findUnit(code)) fields.id = `Mã ${code} đã tồn tại.`;
+  if (!name || name.trim().length < 3) fields.name = 'Tên đơn vị tối thiểu 3 ký tự.';
+  const parent = findUnit(parentId);
+  if (!parent) fields.parent = 'Chọn đơn vị cha.';
+  else if (parent.node.inactive) fields.parent = 'Đơn vị cha đang ngừng dùng.';
+  if (Object.keys(fields).length) throw new ApiError('Thông tin đơn vị chưa hợp lệ.', fields);
+  const unit = { id: code, name: name.trim(), source: 'MANUAL', created_at: iso() };
+  (parent.node.children ||= []).push(unit);
+  appendAudit({ action_code: 'ORG_UNIT_CREATED', target: code, detail: `${unit.name}, thuộc ${parent.node.name}` });
+  return clone(unit);
+}
+
+/** PATCH /org-units/{id}  body: { name, reason } — chỉ đơn vị khai báo tay; đơn vị đồng bộ sửa ở hệ thống nguồn. */
+export async function renameOrgUnit(id, name, reason) {
+  await wait();
+  const hit = findUnit(id);
+  if (hit.node.source !== 'MANUAL') throw new ApiError('Đơn vị này đồng bộ từ hệ thống nguồn, cần sửa tại nguồn rồi đồng bộ lại.');
+  if (!name || name.trim().length < 3) throw new ApiError('Tên đơn vị tối thiểu 3 ký tự.', { name: 'Tối thiểu 3 ký tự.' });
+  const old = hit.node.name;
+  hit.node.name = name.trim();
+  appendAudit({ action_code: 'ORG_UNIT_UPDATED', target: id, detail: `“${old}” → “${hit.node.name}”. ${reason || ''}`.trim() });
+  return clone(hit.node);
+}
+
+/** POST /org-units/{id}/deactivate | /activate  body: { reason } — không cho ngừng dùng khi còn người hoặc chính sách tham chiếu. */
+export async function setOrgUnitActive(id, active, reason) {
+  await wait();
+  const hit = findUnit(id);
+  if (id === 'ALL') throw new ApiError('Không thể ngừng dùng gốc cây tổ chức.');
+  if (!active) {
+    const u = unitUsage(id);
+    if (u.subjects || u.policies.length) throw new ApiError(`Còn ${u.subjects} hồ sơ${u.policies.length ? ` và chính sách ${u.policies.join(', ')}` : ''} gắn với đơn vị này. Chuyển hồ sơ hoặc sửa chính sách trước.`);
+  } else if (hit.parent?.inactive) throw new ApiError('Đơn vị cha đang ngừng dùng, cần dùng lại đơn vị cha trước.');
+  hit.node.inactive = !active;
+  appendAudit({ action_code: active ? 'ORG_UNIT_ACTIVATED' : 'ORG_UNIT_DEACTIVATED', target: id, detail: reason });
+  return clone(hit.node);
+}
+
+/** POST /org-units/sync  — kéo danh mục từ Hệ thống Nhân sự. */
+export async function syncOrgUnitsFromHR() {
+  await wait(700);
+  const added = [];
+  db.hrPendingUnits.forEach((u) => {
+    const parent = findUnit(u.parent);
+    if (!parent || findUnit(u.id)) return;
+    (parent.node.children ||= []).push({ id: u.id, name: u.name, source: 'HR', created_at: iso() });
+    added.push(u);
+  });
+  db.hrPendingUnits = [];
+  const hr = db.sources.find((x) => x.id === 'HR');
+  if (hr) hr.last_sync = iso();
+  appendAudit({ action_code: 'SOURCE_SYNC', target: 'HR', detail: `Danh mục đơn vị: thêm ${added.length}` });
+  return { added };
 }
 
 export { ROLES };

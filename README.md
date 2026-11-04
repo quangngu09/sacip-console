@@ -17,9 +17,11 @@ Build: `npm run build` (thư mục `dist/`), hoặc `npm run build:single` để
 | `#/yeu-cau` | Hộp yêu cầu chung (REQ-xxxx), chuỗi duyệt lấy từ chính sách, từ chối bắt buộc lý do, thu hồi 2 người, AI tự duyệt | Đặc tả IAM §2.3 |
 | `#/dong-y` | Đồng ý & bảo mật: phiên bản điều khoản, tỷ lệ đồng ý, quyền được lãng quên | Đặc tả IAM §2.5 |
 | `#/chinh-sach` | Chính sách sinh trắc (lịch sử phiên bản, khôi phục) và Quy tắc sự kiện | Đặc tả Policy Engine, Blueprint §4.2 |
-| `#/chinh-sach/:id/sua` | Wizard 4 bước + xem lại, kiểm tra lỗi trực tiếp, chạy thử, lưu thành phiên bản mới | Đặc tả Policy Engine §2, §4 |
-| `#/tich-hop` | Nguồn dữ liệu đầu vào và sự kiện gửi đi (Kafka / webhook) | Đặc tả Policy Engine §1, §3 |
-| `#/khong-gian`, `#/thiet-bi`, `#/thoi-khoa-bieu`, `#/soc`, `#/giam-sat-ai` | Như trước | Blueprint |
+| `#/chinh-sach/:id/sua` | Wizard 4 bước + xem lại, tìm nhanh đơn vị và khu vực (gõ không dấu), kiểm tra lỗi trực tiếp, chạy thử, lưu thành phiên bản mới | Đặc tả Policy Engine §2, §4 |
+| `#/tich-hop` | Nguồn dữ liệu đầu vào, sự kiện gửi đi (Kafka / RabbitMQ / webhook), tác vụ quét hợp đồng sắp hết hạn | Đặc tả Policy Engine §1, §3 |
+| `#/don-vi` | Đơn vị tổ chức: cây khoa/phòng/đơn vị thuê ngoài, đồng bộ từ Nhân sự hoặc khai báo tay, chặn ngừng dùng khi còn hồ sơ hay chính sách | Đặc tả Policy Engine §1 |
+| `#/khong-gian` | Cây Tòa → Tầng → Phòng. “Thêm khu vực” (Quản trị hệ thống): chọn tòa có sẵn hoặc khai báo tòa mới, tầng (tự tạo nếu chưa có), mã phòng gợi ý theo tầng, loại khu vực, căn cứ khai báo. Phòng mới chờ duyệt hạ tầng; duyệt xong mới gán thiết bị và chọn được trong chính sách | Blueprint, Đặc tả Policy Engine bước 2 |
+| `#/thiet-bi`, `#/thoi-khoa-bieu`, `#/soc`, `#/giam-sat-ai` | Như trước | Blueprint |
 | `#/nhat-ky` | Kiểm toán: chỉ số, chuỗi băm bất biến, kiểm tra toàn vẹn, xuất kèm mã băm | Đặc tả IAM §2.6 |
 | `#/kiosk` | Kiosk: số tư thế theo chính sách, ký đồng ý tại quầy, AI tự duyệt hoặc chuyển người duyệt | Đặc tả Policy Engine bước 3 |
 
@@ -42,7 +44,15 @@ Thu hồi cần 2 người khác nhau: xác nhận lần 1 bằng một vai trò
 - `src/api/enums.js`: mã và nhãn tiếng Việt cho loại đối tượng, nguồn, 5 chiều trạng thái, loại yêu cầu, action_code, vai trò.
 - Dữ liệu chỉ nằm trong bộ nhớ trình duyệt: tải lại trang là về trạng thái ban đầu.
 
-Endpoint đang giả lập: `GET /bootstrap`, `POST /subjects/{id}/original-image-url`, `POST /subjects/{id}/lock|unlock|activate`, `POST /subjects/bulk`, `POST /requests`, `POST /requests/{id}/approve|reject|cancel`, `POST /policies/{id}/versions`, `POST /policies/{id}/rollback`, `POST /policies/{id}/dry-run`, `POST /consents/reconfirm`, `POST /subjects/{id}/consent`, `POST /erasures/{id}/advance`, `POST /sources/{id}/sync`, `POST /events/{id}/retry`, `GET /audit/verify`, `POST /audit/export`, `POST /kiosk/enroll`.
+Endpoint đang giả lập: `GET /bootstrap`, `POST /subjects/{id}/original-image-url`, `POST /subjects/{id}/lock|unlock|activate`, `POST /subjects/bulk`, `POST /requests`, `POST /requests/{id}/approve|reject|cancel`, `POST /policies/{id}/versions`, `POST /policies/{id}/rollback`, `POST /policies/{id}/dry-run`, `POST /consents/reconfirm`, `POST /subjects/{id}/consent`, `POST /erasures/{id}/advance`, `POST /sources/{id}/sync`, `POST /events/{id}/retry`, `GET /audit/verify`, `POST /audit/export`, `POST /kiosk/enroll`, `POST /subjects/{id}/risk`, `POST /subjects/{id}/risk/clear`, `POST /jobs/contract-check/run`, `POST /org-units`, `PATCH /org-units/{id}`, `POST /org-units/{id}/activate|deactivate`, `POST /org-units/sync`, `POST /spaces/rooms`, `POST /spaces/rooms/{id}/approve`, `PATCH /spaces/rooms/{id}`, `POST|DELETE /spaces/rooms/{id}/devices`.
+
+## Sự kiện gửi ra ngoài (Đặc tả Policy Engine §3)
+| Sự kiện | Khi nào bắn | Dữ liệu |
+|---|---|---|
+| `ACADEMIC_VERIFIED` (Trigger A) | Trạng thái thu thập chuyển sang Hoàn tất (Kiosk, duyệt đăng ký mới), không chờ duyệt hiệu lực. Mỗi phiên bản mẫu `face_profile_id` chỉ báo một lần | `student_code`, `face_profile_id`, `status: VERIFIED` |
+| `ACCESS_SYNC` (Trigger B) | Hiệu lực thay đổi hoặc chụp lại khi đang hiệu lực | `operation` (`UPSERT_TEMPLATE` / `DELETE_TEMPLATE`), mẫu mã hóa AES-256-GCM kèm `key_id`, danh sách thiết bị nhận diện (camera, cổng xoay, máy xử lý biên) trong các khu vực của chính sách |
+| `NOTIFY_RISK` | Cán bộ gắn cờ rủi ro trên hồ sơ, hoặc Kiosk chụp điểm thấp hơn ngưỡng quá 15 điểm. Không tự khóa | `risk_level`, `risk_flags` |
+| `NOTIFY_CONTRACT` | Tác vụ quét hằng ngày (hoặc “Chạy ngay”) thấy hợp đồng nhà thầu còn ≤ số ngày báo trước của chính sách; mỗi mốc hết hạn báo một lần | `contract_no`, `contract_until`, `days_left` |
 
 ## Quyết định thiết kế khi hai tài liệu khác nhau
 - AI được tự duyệt khi chính sách bật và điểm đạt ngưỡng; mỗi lượt ghi `AUTO_APPROVE_FACE_ID`. AI không bao giờ tự từ chối hay tự thu hồi.
@@ -67,7 +77,8 @@ Endpoint đang giả lập: `GET /bootstrap`, `POST /subjects/{id}/original-imag
 - Component dùng chung ở `src/components/ui.jsx`: `Select`, `Tabs`, `Banner`, `MetricStrip`, `SearchInput`, `PageHeader`, `Modal`, `Drawer`, `ConfirmReason`, `DataBoundary`, `SortTh`. Bảng dùng class `.data-table` và hook `useSort`.
 - Thuật ngữ và định dạng số, ngày: xem [docs/glossary.md](docs/glossary.md).
 - Phạm vi: dùng `useScope` (`src/lib/scope.js`) để lọc theo mã đơn vị (`org_unit`) và `subject_type`. Phạm vi chỉ có hiệu lực ở trang Tổng quan; các trang khác luôn hiển thị toàn bộ dữ liệu.
-- Thành phần mới trong `ui.jsx`: `StateBadge`, `SourceBadge`, `SubjectTypeChip`, `ChipToggleGroup`, `FieldError`, `Switch`, `useCountdown`, `RequirePerm`.
+- Thành phần mới trong `ui.jsx`: `StateBadge`, `SourceBadge`, `SubjectTypeChip`, `ChipToggleGroup`, `FieldError`, `Switch`, `useCountdown`, `RequirePerm`, `Combobox` (ô tìm có gợi ý, ↑/↓/Enter/Esc, tìm không dấu qua `fold`).
+- Danh sách đơn vị lấy từ `unitOptions()` / `unitName()` trong `scope.js`, đọc cây hiện tại nên đơn vị thêm ở trang Đơn vị tổ chức có ngay ở bộ lọc và wizard.
 
 ## Trạng thái dữ liệu
 `DataBoundary` hiển thị trạng thái đang tải, lỗi kèm "Thử lại" và phạm vi chưa có dữ liệu. Khi có backend, chỉ cần thay `loadResource` trong `src/lib/resource.js` bằng lời gọi API (độ trễ giả lập cũng nằm ở đó).

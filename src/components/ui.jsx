@@ -627,3 +627,59 @@ export function RequirePerm({ perm, children }) {
     <div className="card"><Empty icon="lock" title="Vai trò hiện tại không được xem trang này" desc={`${actor.name} chưa được cấp quyền. Đổi vai trò ở góc trên bên phải để mô phỏng tài khoản khác.`} /></div>
   );
 }
+
+/** Bỏ dấu tiếng Việt để tìm “cntt”, “cong nghe” hay “Công nghệ” đều ra. */
+export const fold = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+
+/**
+ * Ô tìm và chọn có gợi ý (combobox). Gõ để lọc, ↑/↓ để di chuyển, Enter để chọn, Esc để đóng.
+ * options: [{ value, label, hint, group, disabled, picked }]. Mục đã chọn vẫn hiện, có dấu tích, chọn lại thì bỏ.
+ */
+export function Combobox({ options, onPick, label, placeholder = 'Gõ để tìm…', emptyText = 'Không có kết quả phù hợp.', className = '', max = 8 }) {
+  const [q, setQ] = useState('');
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const listId = useId();
+  const box = useRef(null);
+  const hits = useMemo(() => {
+    const f = fold(q.trim());
+    if (!f) return [];
+    return options.filter((o) => fold(`${o.value} ${o.label} ${o.hint || ''} ${o.group || ''}`).includes(f)).slice(0, max);
+  }, [q, options, max]);
+  useEffect(() => { setActive(0); }, [q]);
+  useEffect(() => {
+    const close = (e) => { if (box.current && !box.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+  const pick = (o) => { if (!o || o.disabled) return; onPick(o.value, o); setQ(''); setOpen(false); };
+  const onKey = (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setActive((a) => Math.min(a + 1, hits.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }
+    else if (e.key === 'Enter') { if (open && hits[active]) { e.preventDefault(); pick(hits[active]); } }
+    else if (e.key === 'Escape') { setOpen(false); }
+  };
+  const show = open && q.trim();
+  return (
+    <div ref={box} className={`relative ${className}`}>
+      <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
+      <input className="input pl-9" role="combobox" aria-label={label} aria-expanded={!!show} aria-controls={listId} aria-autocomplete="list"
+        aria-activedescendant={show && hits[active] ? `${listId}-${active}` : undefined}
+        placeholder={placeholder} value={q} onChange={(e) => { setQ(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onKeyDown={onKey} />
+      {show && (
+        <ul id={listId} role="listbox" aria-label={label} className="absolute z-30 left-0 right-0 mt-1 max-h-[280px] overflow-y-auto rounded border border-border-control bg-surface shadow-lg py-1">
+          {hits.length === 0 && <li className="px-3 py-2 text-caption text-text-secondary">{emptyText}</li>}
+          {hits.map((o, i) => (
+            <li key={o.value} id={`${listId}-${i}`} role="option" aria-selected={i === active} aria-disabled={o.disabled || undefined}
+              onMouseDown={(e) => { e.preventDefault(); pick(o); }} onMouseEnter={() => setActive(i)}
+              className={`px-3 py-1.5 flex items-center gap-2 text-body-sm ${o.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${i === active ? 'bg-surface-container-low' : ''}`}>
+              <Icon name={o.picked ? 'check_box' : 'check_box_outline_blank'} size={16} className={o.picked ? 'text-primary-container' : 'text-text-secondary'} />
+              <span className="flex-1 min-w-0"><span className="block truncate">{o.label}</span>{(o.hint || o.group) && <span className="block truncate text-caption text-text-secondary">{[o.group, o.hint].filter(Boolean).join(' • ')}</span>}</span>
+              <span className="font-mono text-caption text-text-secondary">{o.value}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}

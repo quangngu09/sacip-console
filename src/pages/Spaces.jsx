@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Banner, DataBoundary, Icon, Chip, Empty, PageHeader, ConfirmReason, SearchInput, Select, StatusDot } from '../components/ui';
+import { Banner, DataBoundary, Icon, Chip, Empty, FieldError, Modal, PageHeader, ConfirmReason, SearchInput, Select, StatusDot } from '../components/ui';
 import { useApp } from '../store';
-import { SPACE_TREE, DEVICES } from '../data/mock';
+import { approveRoom, assignDevice, createRoom, setRoomZone, suggestRoomCode } from '../api/client';
+import { DEVICES } from '../data/mock';
 
 const ZONE = { Public: ['status-active', 'Công cộng'], Operational: ['primary', 'Vận hành'], Restricted: ['status-pending', 'Hạn chế'], Forbidden: ['status-rejected', 'Cấm'] };
 const ZONE_OPTIONS = Object.entries(ZONE).map(([value, z]) => ({ value, label: z[1] }));
 const flatRooms = (tree) => tree.flatMap((b) => b.children.flatMap((f) => f.children.map((r) => ({ ...r, building: b.name, floor: f.name }))));
 
 export default function Spaces() {
-  const { log, toast } = useApp();
-  const [tree, setTree] = useState(SPACE_TREE);
+  const { data, call, log, toast, can } = useApp();
+  const tree = data.spaces;
+  const [adding, setAdding] = useState(false);
   const [open, setOpen] = useState(new Set(['A', 'C', 'K', 'C-3', 'A-1']));
   const [sel, setSel] = useState('C305');
   const [q, setQ] = useState('');
@@ -24,21 +26,20 @@ export default function Spaces() {
   const matches = (r) => !query || `${r.id} ${r.name}`.toLowerCase().includes(query);
   const anyMatch = !query || rooms.some(matches);
 
-  const patchRoom = (id, fn) => setTree((t) => t.map((b) => ({ ...b, children: b.children.map((f) => ({ ...f, children: f.children.map((r) => (r.id === id ? fn(r) : r)) })) })));
+  // Mọi thay đổi đi qua API để wizard chính sách và việc gửi mẫu xuống thiết bị thấy ngay.
+  const run = async (fn, ok) => { try { await call(fn); ok(); } catch (e) { toast('Không thực hiện được', e.message, 'error'); } };
   const toggle = (id) => setOpen((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const doAssign = () => {
     if (!assign) return;
-    patchRoom(room.id, (r) => ({ ...r, devices: [...r.devices, assign] }));
-    log(`Gắn cố định ${assign} → ${room.id}`, room.id);
-    toast('Đã gán thiết bị', `${assign} → phòng ${room.id}`, 'success');
-    setAssign('');
+    const id = assign;
+    run(() => assignDevice(room.id, id, true), () => { toast('Đã gán thiết bị', `${id} → phòng ${room.id}`, 'success'); setAssign(''); });
   };
 
   return (
     <div>
       <PageHeader title="Không gian & khu vực" desc="Quản lý cây Tòa → Tầng → Phòng, loại khu vực và thiết bị gắn cố định với từng phòng."
-        actions={<button className="btn-primary" onClick={() => toast('Thêm khu vực', 'Khu vực mới sẽ ở trạng thái “Chờ duyệt hạ tầng”.')}><Icon name="add" />Thêm khu vực</button>} />
+        actions={<button className="btn-primary" disabled={!can('space_write')} title={!can('space_write') ? 'Chỉ Quản trị hệ thống được thêm khu vực' : undefined} onClick={() => setAdding(true)}><Icon name="add" />Thêm khu vực</button>} />
 
       <DataBoundary name="spaces" label="cây không gian" scopeNote="global" skeleton="bar-split">
       <Banner tone="warn" title="Hạ tầng đi trước, thiết bị theo sau." className="mb-space-md">Phòng chưa được duyệt hạ tầng thì chưa được gán camera, thiết bị hay phát hành mã QR điểm danh.</Banner>
@@ -105,7 +106,7 @@ export default function Spaces() {
                       <li key={id} className="px-3 py-2 flex items-center gap-3 text-body-sm">
                         <span className="min-w-0"><span className="font-mono font-medium">{id}</span> <span className="text-caption text-text-secondary">{d?.kind}</span></span>
                         <span className="ml-auto"><StatusDot color={d?.online ? 'status-active' : 'status-rejected'} label={d?.online ? 'Trực tuyến' : 'Mất kết nối'} /></span>
-                        <button className="w-8 h-8 rounded flex items-center justify-center text-text-secondary hover:bg-status-rejected/10 hover:text-status-rejected" aria-label={`Gỡ ${id} khỏi phòng`} title="Gỡ khỏi phòng" onClick={() => { patchRoom(room.id, (r) => ({ ...r, devices: r.devices.filter((x) => x !== id) })); log(`Gỡ ${id} khỏi ${room.id}`, room.id); }}><Icon name="link_off" /></button>
+                        <button className="w-8 h-8 rounded flex items-center justify-center text-text-secondary hover:bg-status-rejected/10 hover:text-status-rejected" aria-label={`Gỡ ${id} khỏi phòng`} title="Gỡ khỏi phòng" onClick={() => run(() => assignDevice(room.id, id, false), () => toast('Đã gỡ thiết bị', `${id} khỏi ${room.id}`, 'success'))}><Icon name="link_off" /></button>
                       </li>); })}
                   </ul>
                 )}
@@ -131,13 +132,142 @@ export default function Spaces() {
       </DataBoundary>
 
       <ConfirmReason open={approveAsk} onClose={() => setApproveAsk(false)} title="Duyệt hạ tầng khu vực" subtitle={room && `${room.id} • ${room.name}`} confirmLabel="Duyệt"
-        onConfirm={(reason) => { patchRoom(room.id, (r) => ({ ...r, approved: true })); log(`Duyệt hạ tầng — ${reason}`, room.id); toast('Đã duyệt hạ tầng', `${room.id} có thể gán thiết bị và phát QR.`, 'success'); setApproveAsk(false); }}>
+        onConfirm={(reason) => run(() => approveRoom(room.id, reason), () => { toast('Đã duyệt hạ tầng', `${room.id} có thể gán thiết bị, phát QR và chọn trong chính sách.`, 'success'); setApproveAsk(false); })}>
         <div className="p-3 rounded-lg bg-surface-container-low text-body-sm">Xác nhận phòng đã được khảo sát thực địa và khai báo đúng vị trí (Tòa → Tầng → Phòng).</div>
       </ConfirmReason>
       <ConfirmReason open={!!zoneAsk} onClose={() => setZoneAsk(null)} title="Đổi loại khu vực" subtitle={room && zoneAsk && `${room.id}: ${ZONE[room.zone][1]} → ${ZONE[zoneAsk][1]}`} confirmLabel="Xác nhận đổi"
-        onConfirm={(reason) => { patchRoom(room.id, (r) => ({ ...r, zone: zoneAsk })); log(`Đổi loại khu vực ${room.id} sang ${ZONE[zoneAsk][1]} — ${reason}`, room.id); toast('Đã đổi loại khu vực', `${room.id}: ${ZONE[zoneAsk][1]}`, 'success'); setZoneAsk(null); }}>
+        onConfirm={(reason) => run(() => setRoomZone(room.id, zoneAsk, reason), () => { toast('Đã đổi loại khu vực', `${room.id}: ${ZONE[zoneAsk][1]}`, 'success'); setZoneAsk(null); })}>
         <div className="p-3 rounded-lg bg-surface-container-low text-body-sm">Loại khu vực quyết định quy tắc áp dụng, gồm cả cảnh báo an ninh tức thời.</div>
       </ConfirmReason>
+      {adding && <AddRoom tree={tree} defaults={room} onClose={() => setAdding(false)}
+        onDone={(r) => { setOpen((s) => new Set([...s, r.building_id, r.floor_id])); setSel(r.room.id); setQ(''); }} />}
     </div>
+  );
+}
+
+const NEW_BUILDING = '__new__';
+const ZONE_HINT = {
+  Public: 'Ai có Face ID hiệu lực cũng qua được; không cảnh báo.',
+  Operational: 'Chỉ người thuộc chính sách có khu vực này; dùng cho phòng học, phòng làm việc.',
+  Restricted: 'Người không có quyền xuất hiện sẽ báo an ninh trong 2 giây.',
+  Forbidden: 'Mọi lượt xuất hiện đều báo an ninh; không cấp quyền qua chính sách.',
+};
+
+/** Thêm khu vực: chọn tòa (hoặc khai báo tòa mới), tầng, mã và tên phòng, loại khu vực. Phòng mới luôn chờ duyệt hạ tầng. */
+function AddRoom({ tree, defaults, onClose, onDone }) {
+  const { call, toast } = useApp();
+  const floorOf = (id) => Number(String(id || '').split('-')[1]) || 1;
+  const startB = tree.find((b) => b.children.some((f) => f.children.some((r) => r.id === defaults?.id))) || tree[0];
+  const startF = startB?.children.find((f) => f.children.some((r) => r.id === defaults?.id)) || startB?.children[0];
+  const [building, setBuilding] = useState(startB?.id || NEW_BUILDING);
+  const [newId, setNewId] = useState('');
+  const [newName, setNewName] = useState('');
+  const [floorNo, setFloorNo] = useState(String(floorOf(startF?.id)));
+  const bid = building === NEW_BUILDING ? newId.trim().toUpperCase() : building;
+  const suggested = suggestRoomCode(bid, floorNo);
+  const [code, setCode] = useState(suggested);
+  const [codeTouched, setCodeTouched] = useState(false);
+  const [name, setName] = useState('');
+  const [zone, setZone] = useState('Operational');
+  const [reason, setReason] = useState('');
+  const [errors, setErrors] = useState({});
+  const [busy, setBusy] = useState(false);
+  const shownCode = codeTouched ? code : suggested;
+  const b = tree.find((x) => x.id === building);
+  const floors = b ? b.children.map((f) => ({ value: String(floorOf(f.id)), label: `${f.name} (${f.children.length} phòng)` })) : [];
+  const floorExists = floors.some((f) => f.value === String(floorNo));
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      const r = await call(createRoom, {
+        building: building === NEW_BUILDING ? { new_id: newId, new_name: newName } : { id: building },
+        floor_no: Number(floorNo), code: shownCode, name, zone, reason,
+      });
+      toast('Đã thêm khu vực', `${r.room.id} • ${r.room.name} đang chờ duyệt hạ tầng.`, 'success');
+      onDone(r); onClose();
+    } catch (e) { setErrors(e.fields || {}); if (!e.fields) toast('Không thêm được', e.message, 'error'); }
+    setBusy(false);
+  };
+  const inv = (k) => (errors[k] ? '!border-status-rejected' : '');
+  // Sửa ô nào thì bỏ lỗi của ô đó, không để lỗi cũ treo lại.
+  const clr = (...keys) => setErrors((e) => { const n = { ...e }; keys.forEach((k) => delete n[k]); return n; });
+  const L = ({ children, req }) => <span className="text-label-md font-semibold">{children}{req && <span className="text-status-rejected"> *</span>}</span>;
+
+  return (
+    <Modal open onClose={onClose} width="max-w-2xl">
+      <div className="p-space-md border-b border-border-subtle flex items-center gap-2.5">
+        <Icon name="add_location_alt" size={22} className="text-primary-container" />
+        <div className="flex-1"><h3 className="text-headline-md">Thêm khu vực</h3><p className="text-caption text-text-secondary">Khu vực mới ở trạng thái “Chờ duyệt hạ tầng” cho đến khi khảo sát thực địa xong.</p></div>
+        <button className="p-1 rounded-lg hover:bg-surface-container text-text-secondary" onClick={onClose} aria-label="Đóng"><Icon name="close" size={20} /></button>
+      </div>
+      <div className="p-space-md flex flex-col gap-space-md overflow-y-auto">
+        <fieldset className="grid grid-cols-2 gap-space-md">
+          <legend className="sr-only">Vị trí</legend>
+          <label className="flex flex-col gap-1.5"><L req>Tòa nhà</L>
+            <Select label="Tòa nhà" value={building} onChange={(v) => { setBuilding(v); const nb = tree.find((x) => x.id === v); if (nb?.children[0]) setFloorNo(String(floorOf(nb.children[0].id))); setCodeTouched(false); setErrors({}); }} options={[...tree.map((x) => ({ value: x.id, label: x.name })), { value: NEW_BUILDING, label: '+ Tòa nhà mới…' }]} />
+            <FieldError msg={errors.building} />
+          </label>
+          <label className="flex flex-col gap-1.5"><L req>Tầng</L>
+            <div className="flex gap-2">
+              <input className={`input w-24 ${inv('floor_no')}`} type="number" min={1} max={30} aria-label="Số tầng" value={floorNo} onChange={(e) => { setFloorNo(e.target.value); setCodeTouched(false); clr('floor_no', 'code'); }} />
+              {floors.length > 0 && <Select className="flex-1 min-w-0" label="Chọn tầng có sẵn" placeholder="Tầng có sẵn" value={floorExists ? String(floorNo) : ''} options={floors} onChange={(v) => { setFloorNo(v); setCodeTouched(false); clr('floor_no', 'code'); }} />}
+            </div>
+            {!errors.floor_no && floorNo && !floorExists && <span className="text-caption text-text-secondary">Tầng {floorNo} chưa có, sẽ được tạo cùng phòng.</span>}
+            <FieldError msg={errors.floor_no} />
+          </label>
+          {building === NEW_BUILDING && (
+            <>
+              <label className="flex flex-col gap-1.5"><L req>Mã tòa</L>
+                <input className={`input font-mono uppercase ${inv('building_id')}`} maxLength={1} placeholder="VD: D" value={newId} onChange={(e) => { setNewId(e.target.value.toUpperCase()); clr('building_id', 'code'); }} />
+                <FieldError msg={errors.building_id} />
+              </label>
+              <label className="flex flex-col gap-1.5"><L req>Tên tòa</L>
+                <input className={`input ${inv('building_name')}`} placeholder="VD: Tòa D — Thư viện" value={newName} onChange={(e) => { setNewName(e.target.value); clr('building_name'); }} />
+                <FieldError msg={errors.building_name} />
+              </label>
+            </>
+          )}
+        </fieldset>
+
+        <div className="grid grid-cols-3 gap-space-md">
+          <label className="flex flex-col gap-1.5"><L req>Mã phòng</L>
+            <input className={`input font-mono uppercase ${inv('code')}`} maxLength={5} placeholder={bid ? `${bid}${floorNo || 1}01` : 'VD: D101'} value={shownCode} onChange={(e) => { setCodeTouched(true); setCode(e.target.value.toUpperCase()); clr('code'); }} />
+            {!codeTouched && suggested && !errors.code && <span className="text-caption text-text-secondary">Gợi ý theo tầng, sửa được.</span>}
+            <FieldError msg={errors.code} />
+          </label>
+          <label className="col-span-2 flex flex-col gap-1.5"><L req>Tên khu vực</L>
+            <input className={`input ${inv('name')}`} placeholder="VD: Phòng máy C306" value={name} onChange={(e) => { setName(e.target.value); clr('name'); }} />
+            <FieldError msg={errors.name} />
+          </label>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <L req>Loại khu vực</L>
+          <div role="radiogroup" aria-label="Loại khu vực" className="grid grid-cols-4 gap-2">
+            {ZONE_OPTIONS.map((o) => (
+              <button key={o.value} type="button" role="radio" aria-checked={zone === o.value} onClick={() => setZone(o.value)}
+                className={`min-h-[40px] px-3 rounded border text-body-sm flex items-center gap-2 ${zone === o.value ? 'border-primary-container bg-primary-fixed text-primary-container font-medium' : 'border-border-control hover:bg-surface-container-low'}`}>
+                <Icon name={zone === o.value ? 'radio_button_checked' : 'radio_button_unchecked'} size={18} />{o.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-caption text-text-secondary">{ZONE_HINT[zone]}</p>
+        </div>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="flex justify-between"><L req>Căn cứ khai báo</L><span className="text-caption text-text-secondary">Tối thiểu 10 ký tự</span></span>
+          <textarea className={`input leading-relaxed ${inv('reason')}`} rows={2} placeholder="VD: Theo quyết định cải tạo phòng máy số 45/QĐ-ĐN, bàn giao 01/12/2026." value={reason} onChange={(e) => { setReason(e.target.value); clr('reason'); }} />
+          <FieldError msg={errors.reason} />
+        </label>
+      </div>
+      <div className="p-space-md bg-surface-bright border-t border-border-subtle flex items-center justify-between">
+        <span className="flex items-center gap-1.5 text-caption text-text-secondary"><Icon name="lock" size={16} />Ghi nhật ký SPACE_CREATED</span>
+        <div className="flex gap-2">
+          <button className="btn-outline" onClick={onClose}>Hủy</button>
+          <button className="btn-primary" disabled={busy || !shownCode || !name.trim()} onClick={save}><Icon name="check" />{busy ? 'Đang lưu' : 'Thêm khu vực'}</button>
+        </div>
+      </div>
+    </Modal>
   );
 }
