@@ -22,6 +22,7 @@ import Schedule from './pages/Schedule';
 import Policies from './pages/Policies';
 import PolicyEditor from './pages/PolicyEditor';
 import Integrations from './pages/Integrations';
+import OrgUnits from './pages/OrgUnits';
 import Soc from './pages/Soc';
 import Kiosk from './pages/Kiosk';
 import { AiMonitor, AuditLog, Consents } from './pages/Misc';
@@ -37,6 +38,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="ho-so" element={<Profiles />} />
             <Route path="yeu-cau" element={<Requests />} />
             <Route path="dong-y" element={<RequirePerm perm="consent"><Consents /></RequirePerm>} />
+            <Route path="don-vi" element={<OrgUnits />} />
             <Route path="khong-gian" element={<Spaces />} />
             <Route path="thiet-bi" element={<Devices />} />
             <Route path="thoi-khoa-bieu" element={<Schedule />} />

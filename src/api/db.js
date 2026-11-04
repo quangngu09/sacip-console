@@ -11,28 +11,32 @@ const ahead = (ms) => new Date(now + ms).toISOString();
 export const TENANT = 'Đại học Đại Nam';
 
 /** Cây tổ chức (Org Unit Tree) cho bước 1 của wizard chính sách. */
+// source: HR = đồng bộ từ Hệ thống Nhân sự (không sửa tay), CONTRACTOR = từ Cổng Quản lý Nhà thầu, MANUAL = khai báo trên Console.
 export const ORG_TREE = [
-  { id: 'ALL', name: 'Toàn trường', children: [
-    { id: 'FAC', name: 'Các khoa, viện', children: [
-      { id: 'CNTT', name: 'Khoa Công nghệ Thông tin' },
-      { id: 'KT', name: 'Khoa Kinh tế & QTKD' },
-      { id: 'DDT', name: 'Khoa Điện - Điện tử' },
-      { id: 'NN', name: 'Khoa Ngoại ngữ' },
-      { id: 'LUAT', name: 'Khoa Luật' },
-      { id: 'VDTQT', name: 'Viện Đào tạo Quốc tế' },
+  { id: 'ALL', name: 'Toàn trường', source: 'MANUAL', children: [
+    { id: 'FAC', name: 'Các khoa, viện', source: 'MANUAL', children: [
+      { id: 'CNTT', name: 'Khoa Công nghệ Thông tin', source: 'HR' },
+      { id: 'KT', name: 'Khoa Kinh tế & QTKD', source: 'HR' },
+      { id: 'DDT', name: 'Khoa Điện - Điện tử', source: 'HR' },
+      { id: 'NN', name: 'Khoa Ngoại ngữ', source: 'HR' },
+      { id: 'LUAT', name: 'Khoa Luật', source: 'HR' },
+      { id: 'VDTQT', name: 'Viện Đào tạo Quốc tế', source: 'HR' },
     ]},
-    { id: 'ADM', name: 'Các phòng, ban', children: [
-      { id: 'PDT', name: 'Phòng Đào tạo' },
-      { id: 'HCQT', name: 'Phòng Hành chính - Quản trị' },
-      { id: 'HTQT', name: 'Phòng Hợp tác Quốc tế' },
+    { id: 'ADM', name: 'Các phòng, ban', source: 'MANUAL', children: [
+      { id: 'PDT', name: 'Phòng Đào tạo', source: 'HR' },
+      { id: 'HCQT', name: 'Phòng Hành chính - Quản trị', source: 'HR' },
+      { id: 'HTQT', name: 'Phòng Hợp tác Quốc tế', source: 'HR' },
     ]},
-    { id: 'KTX', name: 'Ban Quản lý KTX' },
-    { id: 'OUT', name: 'Đơn vị thuê ngoài', children: [
-      { id: 'OUT_CANTEEN', name: 'Căng tin (Vending Partner)' },
-      { id: 'OUT_GUARD', name: 'Bảo vệ (An Phát)' },
+    { id: 'KTX', name: 'Ban Quản lý KTX', source: 'HR' },
+    { id: 'OUT', name: 'Đơn vị thuê ngoài', source: 'MANUAL', children: [
+      { id: 'OUT_CANTEEN', name: 'Căng tin (Vending Partner)', source: 'CONTRACTOR' },
+      { id: 'OUT_GUARD', name: 'Bảo vệ (An Phát)', source: 'CONTRACTOR' },
     ]},
   ]},
 ];
+
+/** Đơn vị mới sẽ xuất hiện khi bấm đồng bộ từ Hệ thống Nhân sự (mô phỏng). */
+export const HR_PENDING_UNITS = [{ parent: 'FAC', id: 'DUOC', name: 'Khoa Dược', source: 'HR' }];
 
 const pose = (name, score) => ({ name, score });
 const POSES_6 = ['Trực diện', 'Chúc 15°', 'Ngửa 15°', 'Nghiêng trái 20°', 'Nghiêng phải 20°', 'Đỉnh đầu'];
@@ -78,7 +82,7 @@ export const SUBJECTS = [
   { subject_id: 'sub_7f3a08', code: 'SV-2023-5521', name: 'Trịnh Bảo Ngọc', email: 'ngoc.tb23@student.dnu.edu.vn', subject_type: 'STUDENT', org_unit: 'CNTT', context: { cohort: 'K2023', class: 'K17-CNTT-01' },
     source: 'APP', face_profile_id: 'fp_5521_v1', ai_score: 97, poses: posesFrom(95), valid_until: '30/06/2027',
     states: { collection: 'COMPLETED', validity: 'ACTIVE', request: 'NONE', risk: 'NONE', consent: 'ACTIVE' }, consent_version: 'v1.2', risk_flags: [],
-    bssid_metadata: bssid(AP.C3, { name: 'Phòng học C302', beacon: 'BCN-C302' }, 15), seed: 8 },
+    bssid_metadata: bssid(AP.C3, { name: 'Phòng học C302', beacon: 'BCN-C302' }, 15), seed: 8, academic_sent_for: 'fp_5521_v1' },
   { subject_id: 'sub_7f3a09', code: 'GV-2020-117', name: 'ThS. Nguyễn Văn An', email: 'an.nv@dnu.edu.vn', subject_type: 'STAFF', org_unit: 'KT', context: { role_title: 'Giảng viên', position: 'Cố vấn học tập K66' },
     source: 'CARD_DB', face_profile_id: 'fp_0117_v1', ai_score: 96, poses: [pose('Ảnh thẻ', 96)], valid_until: '31/12/2027',
     states: { collection: 'COMPLETED', validity: 'ACTIVE', request: 'NONE', risk: 'NONE', consent: 'ACTIVE' }, consent_version: 'v1.2', risk_flags: [],
@@ -102,7 +106,7 @@ export const SUBJECTS = [
   { subject_id: 'sub_7f3a14', code: 'EXT-2025-031', name: 'Lý Văn Phúc', email: 'phuc.lv@anphat-security.vn', subject_type: 'CONTRACTOR', org_unit: 'OUT_GUARD', context: { company: 'Công ty Bảo vệ An Phát', contract_no: 'HĐBV-2025/031', contract_until: '13/11/2026' },
     source: 'COUNTER', face_profile_id: 'fp_e031_v1', ai_score: 92, poses: posesFrom(90), valid_until: '13/11/2026',
     states: { collection: 'COMPLETED', validity: 'EXPIRING', request: 'NONE', risk: 'WATCH', consent: 'ACTIVE' }, consent_version: 'v1.2', risk_flags: ['Hợp đồng còn 9 ngày, chưa có phụ lục gia hạn'],
-    bssid_metadata: bssid(AP.A1, { name: 'Cổng chính Tòa A1' }, 10), seed: 14 },
+    bssid_metadata: bssid(AP.A1, { name: 'Cổng chính Tòa A1' }, 10), seed: 14, contract_notified_for: '13/11/2026' },
   { subject_id: 'sub_7f3a15', code: 'KTX-2024-118', name: 'Mai Quỳnh Như', email: 'nhu.mq24@student.dnu.edu.vn', subject_type: 'RESIDENT', org_unit: 'KTX', context: { building: 'KTX Tòa A', room: 'P.215', stay_until: '30/06/2027' },
     source: 'APP', face_profile_id: null, ai_score: null, poses: posesFrom(90, 3), valid_until: null,
     states: { collection: 'IN_PROGRESS', validity: 'NONE', request: 'NONE', risk: 'NONE', consent: 'ACTIVE' }, consent_version: 'v1.2', risk_flags: [],
@@ -161,10 +165,10 @@ export const REQUESTS = [
 
 const TRIGGERS = (opts = {}) => [
   { id: 'ACADEMIC_VERIFIED', target: 'ACADEMIC', event: 'COLLECTION_COMPLETED', transport: 'KAFKA', destination: 'faceid.profile.verified', enabled: opts.academic !== false, payload: ['student_code', 'face_profile_id', 'status: VERIFIED'] },
-  { id: 'ACCESS_SYNC', target: 'ACCESS_CONTROL', event: 'VALIDITY_CHANGED', transport: 'WEBHOOK', destination: 'https://acs.dnu.edu.vn/api/faceid/templates', enabled: true, payload: ['subject_id', 'template (mã hóa)', 'zones', 'validity'] },
+  { id: 'ACCESS_SYNC', target: 'ACCESS_CONTROL', event: 'VALIDITY_CHANGED', transport: 'WEBHOOK', destination: 'https://acs.dnu.edu.vn/api/faceid/templates', enabled: true, payload: ['subject_id', 'operation', 'template (AES-256)', 'zones', 'devices'] },
   { id: 'NOTIFY_RESCAN', target: 'NOTIFICATION', event: 'RESCAN_DECIDED', transport: 'KAFKA', destination: 'notify.push', enabled: true, payload: ['subject_id', 'decision', 'rejection_reason', 'rescan_expires_at'] },
-  { id: 'NOTIFY_RISK', target: 'NOTIFICATION', event: 'RISK_FLAGGED', transport: 'KAFKA', destination: 'notify.push', enabled: true, payload: ['subject_id', 'risk_flags'] },
-  { id: 'NOTIFY_CONTRACT', target: 'NOTIFICATION', event: 'CONTRACT_EXPIRING', transport: 'WEBHOOK', destination: 'https://notify.dnu.edu.vn/hooks/contract', enabled: opts.contract !== false, payload: ['subject_id', 'contract_no', 'contract_until'] },
+  { id: 'NOTIFY_RISK', target: 'NOTIFICATION', event: 'RISK_FLAGGED', transport: 'RABBITMQ', destination: 'security.events/risk.flagged', enabled: true, payload: ['subject_id', 'risk_level', 'risk_flags'] },
+  { id: 'NOTIFY_CONTRACT', target: 'NOTIFICATION', event: 'CONTRACT_EXPIRING', transport: 'WEBHOOK', destination: 'https://notify.dnu.edu.vn/hooks/contract', enabled: opts.contract !== false, payload: ['subject_id', 'contract_no', 'contract_until', 'days_left'] },
 ];
 
 /** Cấu hình rules_config (JSONB) của từng chính sách. */
@@ -193,7 +197,7 @@ const CTR_V10 = {
   scope: { tenant: TENANT, org_units: ['OUT'], subject_types: ['CONTRACTOR'] },
   spatial: { zones: ['A100'], time_window: { preset: 'SHIFT', days: [1, 2, 3, 4, 5, 6, 7], from: '05:30', to: '22:00' } },
   biometric: { accepted_sources: ['COUNTER'], pose_count: 6, min_quality: 88, ai_auto_approve_enabled: false, ai_auto_approve_threshold: 97, rescan_validity_hours: 24, rescan_max_uses: 1, rescan_channels: ['KIOSK'] },
-  workflow: { approval_chain: [{ id: 's1', role: 'CONTRACT_OWNER', label: 'Đơn vị quản lý hợp đồng' }, { id: 's2', role: 'HCQT', label: 'Phòng Hành chính - Quản trị' }], revoke_two_person: true, retention_days_after_withdraw: 7 },
+  workflow: { approval_chain: [{ id: 's1', role: 'CONTRACT_OWNER', label: 'Đơn vị quản lý hợp đồng' }, { id: 's2', role: 'HCQT', label: 'Phòng Hành chính - Quản trị' }], revoke_two_person: true, retention_days_after_withdraw: 7, contract_notice_days: 30 },
   triggers: TRIGGERS({ academic: false }),
 };
 const RES_V10 = {
@@ -265,11 +269,11 @@ export const SOURCES = [
 /** Sự kiện đã gửi sang hệ thống ngoài. */
 export const INTEGRATION_EVENTS = [
   { event_id: 'EVT-55120', trigger_id: 'ACADEMIC_VERIFIED', target: 'ACADEMIC', transport: 'KAFKA', destination: 'faceid.profile.verified', at: ago(49.9 * H), status: 'DELIVERED', ref: 'REQ-8821', payload: { student_code: 'SV-2023-5521', face_profile_id: 'fp_5521_v1', status: 'VERIFIED' } },
-  { event_id: 'EVT-55121', trigger_id: 'ACCESS_SYNC', target: 'ACCESS_CONTROL', transport: 'WEBHOOK', destination: 'https://acs.dnu.edu.vn/api/faceid/templates', at: ago(49.9 * H), status: 'DELIVERED', ref: 'SV-2023-5521', payload: { subject_id: 'sub_7f3a08', validity: 'ACTIVE', zones: ['A100', 'C301', 'C302', 'C202'], devices: 6 } },
+  { event_id: 'EVT-55121', trigger_id: 'ACCESS_SYNC', target: 'ACCESS_CONTROL', transport: 'WEBHOOK', destination: 'https://acs.dnu.edu.vn/api/faceid/templates', at: ago(49.9 * H), status: 'DELIVERED', ref: 'SV-2023-5521', payload: { subject_id: 'sub_7f3a08', validity: 'ACTIVE', operation: 'UPSERT_TEMPLATE', zones: ['A100', 'C301', 'C302', 'C202'], devices: ['TS_A100_01', 'TS_A100_02', 'CAM_C301_01', 'CAM_C302_01', 'CAM_C202_01'], template: { face_profile_id: 'fp_5521_v1', format: 'ArcFace-512d', encryption: 'AES-256-GCM', key_id: 'kms://sacip/face-template/2026-10', ciphertext: '9f3c1a7be04d52c8a61e…', size_bytes: 2048 } } },
   { event_id: 'EVT-55188', trigger_id: 'NOTIFY_RESCAN', target: 'NOTIFICATION', transport: 'KAFKA', destination: 'notify.push', at: ago(26 * H), status: 'DELIVERED', ref: 'REQ-8817', payload: { subject_id: 'sub_7f3a10', decision: 'REJECTED', rejection_reason: 'Đã được chụp lại 2 lần trong học kỳ…' } },
-  { event_id: 'EVT-55201', trigger_id: 'ACCESS_SYNC', target: 'ACCESS_CONTROL', transport: 'WEBHOOK', destination: 'https://acs.dnu.edu.vn/api/faceid/templates', at: ago(5 * H), status: 'DELIVERED', ref: 'SV-2023-4509', payload: { subject_id: 'sub_7f3a11', validity: 'LOCKED', reason: 'WITHDRAW_CONSENT' } },
-  { event_id: 'EVT-55209', trigger_id: 'NOTIFY_RISK', target: 'NOTIFICATION', transport: 'KAFKA', destination: 'notify.push', at: ago(4 * H), status: 'DELIVERED', ref: 'EXT-2024-008', payload: { subject_id: 'sub_7f3a06', risk_flags: ['Nghi dùng ảnh in'] } },
-  { event_id: 'EVT-55214', trigger_id: 'NOTIFY_CONTRACT', target: 'NOTIFICATION', transport: 'WEBHOOK', destination: 'https://notify.dnu.edu.vn/hooks/contract', at: ago(2 * H), status: 'RETRYING', ref: 'EXT-2025-031', payload: { subject_id: 'sub_7f3a14', contract_no: 'HĐBV-2025/031', contract_until: '13/11/2026' }, error: 'Máy chủ thông báo trả lỗi HTTP 503, hệ thống đang tự thử lại.' },
+  { event_id: 'EVT-55201', trigger_id: 'ACCESS_SYNC', target: 'ACCESS_CONTROL', transport: 'WEBHOOK', destination: 'https://acs.dnu.edu.vn/api/faceid/templates', at: ago(5 * H), status: 'DELIVERED', ref: 'SV-2023-4509', payload: { subject_id: 'sub_7f3a11', validity: 'LOCKED', operation: 'DELETE_TEMPLATE', reason: 'WITHDRAW_CONSENT', zones: ['A100', 'C301', 'C302', 'C202'], devices: ['TS_A100_01', 'TS_A100_02', 'CAM_C301_01', 'CAM_C302_01', 'CAM_C202_01'], template: null } },
+  { event_id: 'EVT-55209', trigger_id: 'NOTIFY_RISK', target: 'NOTIFICATION', transport: 'RABBITMQ', destination: 'security.events/risk.flagged', at: ago(4 * H), status: 'DELIVERED', ref: 'EXT-2024-008', payload: { subject_id: 'sub_7f3a06', risk_level: 'HIGH', risk_flags: ['Nghi dùng ảnh in'] } },
+  { event_id: 'EVT-55214', trigger_id: 'NOTIFY_CONTRACT', target: 'NOTIFICATION', transport: 'WEBHOOK', destination: 'https://notify.dnu.edu.vn/hooks/contract', at: ago(2 * H), status: 'RETRYING', ref: 'EXT-2025-031', payload: { subject_id: 'sub_7f3a14', contract_no: 'HĐBV-2025/031', contract_until: '13/11/2026', days_left: 9 }, error: 'Máy chủ thông báo trả lỗi HTTP 503, hệ thống đang tự thử lại.' },
 ];
 
 /** Số liệu tổng hợp (máy chủ tính sẵn) cho Tổng quan và Kiểm toán. */
@@ -316,5 +320,8 @@ export const NOTIFICATIONS = [
   { id: 3, color: 'status-rejected', title: 'Mất kết nối Hệ thống Chấm công', time: '26 giờ trước', body: 'Chính sách dùng ca làm việc đang lấy dữ liệu cũ.', unread: true, to: '/tich-hop' },
   { id: 4, color: 'status-rejected', title: 'Cảnh báo an ninh: khu vực hạn chế', time: '25 phút trước', body: 'Đối tượng lạ xuất hiện tại Phòng Server tầng 5 nhà A.', unread: true, alert: true, to: '/soc' },
 ];
+
+/** Tác vụ định kỳ phía máy chủ. */
+export const JOBS = { contract_check: { schedule: 'Hằng ngày lúc 06:00', last_run: ago(9 * H), last_result: '1 nhà thầu sắp hết hạn, đã gửi thông báo' } };
 
 export const CURRENT_USER = { id: 'NV-2010-015', name: 'Lê Hoàng Minh', ip: '10.10.20.15' };

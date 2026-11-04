@@ -98,12 +98,20 @@ export const TRIGGER_TARGET = {
 };
 
 export const TRIGGER_EVENT = {
-  COLLECTION_COMPLETED: 'Hoàn tất thu thập Face ID hoặc được duyệt đăng ký mới',
+  COLLECTION_COMPLETED: 'Thu thập Face ID hoàn tất (Trạng thái thu thập = Hoàn tất), không chờ duyệt hiệu lực',
   VALIDITY_CHANGED: 'Hồ sơ chuyển sang Đang hiệu lực, Đã khóa hoặc Đã thu hồi',
   RESCAN_DECIDED: 'Yêu cầu chụp lại được duyệt hoặc bị từ chối',
   RISK_FLAGGED: 'Hồ sơ bị gắn cờ rủi ro',
   CONTRACT_EXPIRING: 'Hợp đồng nhà thầu sắp hết hạn',
 };
+
+/** Kênh gửi sự kiện (Đặc tả Policy Engine §3: Kafka / RabbitMQ / Webhook). */
+export const TRANSPORT = {
+  KAFKA: { label: 'Kafka', dest: 'Topic', placeholder: 'faceid.access.sync' },
+  RABBITMQ: { label: 'RabbitMQ', dest: 'Exchange/routing key', placeholder: 'security.events/risk.flagged' },
+  WEBHOOK: { label: 'Webhook', dest: 'URL https', placeholder: 'https://…' },
+};
+export const transportLabel = (t) => TRANSPORT[t]?.label || t;
 
 /** Tên ngắn cho từng loại sự kiện gửi ra ngoài. */
 export const TRIGGER_SHORT = {
@@ -143,6 +151,18 @@ export const ACTION = {
   KIOSK_CAPTURE: 'Kiosk chụp ảnh',
   AUDIT_EXPORT_SIGNED: 'Xuất báo cáo có chữ ký',
   AUDIT_CHAIN_VERIFIED: 'Kiểm tra toàn vẹn nhật ký',
+  RISK_FLAGGED: 'Gắn cờ rủi ro',
+  RISK_CLEARED: 'Gỡ cờ rủi ro',
+  JOB_CONTRACT_CHECK: 'Quét hợp đồng sắp hết hạn',
+  SPACE_CREATED: 'Thêm khu vực',
+  SPACE_APPROVED: 'Duyệt hạ tầng khu vực',
+  SPACE_ZONE_CHANGED: 'Đổi loại khu vực',
+  DEVICE_ASSIGNED: 'Gán thiết bị vào phòng',
+  DEVICE_UNASSIGNED: 'Gỡ thiết bị khỏi phòng',
+  ORG_UNIT_CREATED: 'Thêm đơn vị',
+  ORG_UNIT_UPDATED: 'Sửa đơn vị',
+  ORG_UNIT_DEACTIVATED: 'Ngừng dùng đơn vị',
+  ORG_UNIT_ACTIVATED: 'Dùng lại đơn vị',
   ADMIN_ACTION: 'Thao tác quản trị',
   VIEW_SENSITIVE: 'Xem dữ liệu nhạy cảm',
   SYSTEM_EVENT: 'Sự kiện hệ thống',

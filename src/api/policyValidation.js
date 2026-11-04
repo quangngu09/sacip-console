@@ -19,6 +19,8 @@ export const TIME_PRESETS = {
 
 const URL_RE = /^https:\/\/[\w.-]+(:\d+)?(\/[\w./-]*)?$/;
 const TOPIC_RE = /^[a-z][a-z0-9._-]{2,}$/;
+// RabbitMQ: <exchange>/<routing key>, routing key dạng a.b.c (cho phép * và # của topic exchange).
+const RABBIT_RE = /^[a-z][a-z0-9._-]{1,}\/[a-z0-9*#][a-z0-9._*#-]*$/;
 
 /**
  * Trả về { [đường dẫn trường]: thông báo lỗi }. Đối tượng rỗng nghĩa là hợp lệ.
@@ -70,11 +72,13 @@ export function validatePolicy(c) {
   const chain = c.workflow.approval_chain;
   if (!chain.length) e['workflow.approval_chain'] = 'Chuỗi phê duyệt cần ít nhất một bước.';
   else if (chain.some((s) => !s.label.trim())) e['workflow.approval_chain'] = 'Đặt tên cho mọi bước duyệt.';
+  if (types.includes('CONTRACTOR') && c.workflow.contract_notice_days != null && !(Number.isInteger(c.workflow.contract_notice_days) && c.workflow.contract_notice_days >= 1 && c.workflow.contract_notice_days <= 90)) e['workflow.contract_notice_days'] = 'Số ngày báo trước phải từ 1 đến 90.';
   if (!(c.workflow.retention_days_after_withdraw >= 0 && c.workflow.retention_days_after_withdraw <= 30)) e['workflow.retention_days_after_withdraw'] = 'Theo điều khoản v1.2, dữ liệu phải xóa trong tối đa 30 ngày.';
   c.triggers.forEach((t, i) => {
     if (!t.enabled) return;
     if (t.transport === 'WEBHOOK' && !URL_RE.test(t.destination)) e[`triggers.${i}`] = 'Địa chỉ webhook phải là URL https hợp lệ.';
     if (t.transport === 'KAFKA' && !TOPIC_RE.test(t.destination)) e[`triggers.${i}`] = 'Tên topic chỉ gồm chữ thường, số, dấu chấm, gạch ngang.';
+    if (t.transport === 'RABBITMQ' && !RABBIT_RE.test(t.destination)) e[`triggers.${i}`] = 'RabbitMQ cần dạng exchange/routing.key, ví dụ security.events/risk.flagged.';
     if (t.target === 'ACADEMIC' && !types.includes('STUDENT')) e[`triggers.${i}`] = 'Gửi sang Hệ thống Đào tạo chỉ áp dụng khi chính sách có sinh viên.';
     if (t.event === 'CONTRACT_EXPIRING' && !types.includes('CONTRACTOR')) e[`triggers.${i}`] = 'Thông báo hết hạn hợp đồng chỉ áp dụng khi chính sách có nhà thầu.';
   });
@@ -112,7 +116,7 @@ export const FIELD_LABEL = {
   'biometric.accepted_sources': 'Nguồn chấp nhận', 'biometric.pose_count': 'Số tư thế', 'biometric.min_quality': 'Ngưỡng chất lượng ảnh',
   'biometric.ai_auto_approve_enabled': 'AI tự duyệt', 'biometric.ai_auto_approve_threshold': 'Ngưỡng AI tự duyệt',
   'biometric.rescan_validity_hours': 'Thời hạn chụp lại (giờ)', 'biometric.rescan_max_uses': 'Số lần chụp lại', 'biometric.rescan_channels': 'Nơi chụp lại',
-  'workflow.approval_chain': 'Chuỗi phê duyệt', 'workflow.revoke_two_person': 'Thu hồi cần 2 người', 'workflow.retention_days_after_withdraw': 'Hạn xóa sau rút đồng ý (ngày)',
+  'workflow.approval_chain': 'Chuỗi phê duyệt', 'workflow.revoke_two_person': 'Thu hồi cần 2 người', 'workflow.retention_days_after_withdraw': 'Hạn xóa sau rút đồng ý (ngày)', 'workflow.contract_notice_days': 'Báo hết hạn hợp đồng trước (ngày)',
   triggers: 'Sự kiện gửi ra ngoài',
 };
 

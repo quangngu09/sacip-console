@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Icon, Select } from './ui';
 import { useApp } from '../store';
 import { useResourceLoading } from '../lib/resource';
-import { TENANT_OPTIONS, UNIT_OPTIONS, SUBJECT_OPTIONS } from '../lib/scope';
+import { TENANT_OPTIONS, unitOptions, SUBJECT_OPTIONS } from '../lib/scope';
 import { ROLES } from '../api/enums';
 import logo from '../assets/logo-dnu.svg';
 import logoMark from '../assets/logo-dnu-mark.svg';
@@ -18,6 +18,7 @@ const NAV = [
   ]},
   { group: 'Cấu hình', items: [
     { to: '/chinh-sach', icon: 'policy', label: 'Chính sách & quy tắc', perm: 'view' },
+    { to: '/don-vi', icon: 'corporate_fare', label: 'Đơn vị tổ chức', perm: 'view' },
     { to: '/khong-gian', icon: 'account_tree', label: 'Không gian & khu vực', perm: 'view' },
     { to: '/thiet-bi', icon: 'videocam', label: 'Thiết bị', perm: 'view' },
     { to: '/tich-hop', icon: 'hub', label: 'Nguồn dữ liệu & tích hợp', badge: 'sources', perm: 'view' },
@@ -149,7 +150,7 @@ function TopBar() {
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
           <Select variant="inline" label="Đơn vị chủ quản" value={scope.tenant} options={TENANT_OPTIONS} onChange={(v) => setScope((s) => ({ ...s, tenant: v }))} />
           <span className="text-border-strong" aria-hidden>/</span>
-          <Select variant="inline" label="Khoa / Phòng ban" value={scope.unit} options={UNIT_OPTIONS} onChange={(v) => setScope((s) => ({ ...s, unit: v }))} />
+          <Select variant="inline" label="Khoa / Phòng ban" value={scope.unit} options={unitOptions()} onChange={(v) => setScope((s) => ({ ...s, unit: v }))} />
           <span className="text-border-strong" aria-hidden>/</span>
           <Select variant="inline" label="Đối tượng" value={scope.subject} options={SUBJECT_OPTIONS} onChange={(v) => setScope((s) => ({ ...s, subject: v }))} />
           <form className="flex-1 min-w-[200px] max-w-sm ml-3" onSubmit={(e) => { e.preventDefault(); const q = new FormData(e.target).get('q'); if (q) toast('Trợ lý tra cứu', `Đang tìm: “${q}” trong phạm vi ${scope.tenant}`); }}>

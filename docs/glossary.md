@@ -36,6 +36,13 @@ Dùng thống nhất cho mọi màn hình. Thuật ngữ kỹ thuật chỉ xu�
 | Consent | Đồng ý (xử lý dữ liệu) | Hiển thị kèm phiên bản điều khoản, ví dụ "Đã xác nhận (v1.2)" |
 | Auto-approve | AI tự duyệt | |
 | Trigger, event | Sự kiện gửi sang hệ thống khác | |
+| Transport | Cách gửi | Kafka, RabbitMQ, Webhook (giữ nguyên tên) |
+| Exchange / routing key | Exchange/routing key | Ô địa chỉ RabbitMQ, dạng `exchange/routing.key` |
+| Org Unit | Đơn vị tổ chức | Khoa, phòng, ban, đơn vị thuê ngoài |
+| Deactivate (org unit) | Ngừng dùng | Không xóa; dữ liệu cũ vẫn tra cứu được |
+| Risk flag | Cờ rủi ro, gắn cờ, gỡ cờ | |
+| Encrypted template | Mẫu mã hóa | Không hiển thị chuỗi mã, chỉ thuật toán và khóa |
+| Scheduled job | Tác vụ định kỳ | Nút “Chạy ngay” |
 | Signed URL | Link có thời hạn | 60 giây |
 | Right to be forgotten | Quyền được lãng quên | |
 | Version, rollback | Phiên bản, khôi phục | Khôi phục tạo phiên bản mới, không ghi đè |

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AiCard, Banner, Chip, ConfirmReason, DataBoundary, Drawer, Empty, FaceThumb, Icon, PageHeader, ScoreBar, SearchInput, Select, SortTh, SourceBadge, StateBadge, SubjectTypeChip, Tabs, useCountdown, useSort } from '../components/ui';
 import { useApp } from '../store';
-import { bulkAction, createRequest, policyFor, requestOriginalImage, setValidity } from '../api/client';
+import { bulkAction, clearRisk, createRequest, flagRisk, policyFor, requestOriginalImage, setValidity } from '../api/client';
 import { REQUEST_STATUS, REQUEST_TYPE, SOURCE, STATE, SUBJECT_TYPE, consentLabel, stateMeta } from '../api/enums';
 import { fmtDateTime, fmtNumber, fmtRelative } from '../lib/format';
 import { unitName } from '../lib/scope';
@@ -204,6 +204,7 @@ const StateGrid = ({ s }) => (
 function ProfileDrawer({ s, onClose }) {
   const { data, call, toast, can, log } = useApp();
   const [ask, setAsk] = useState(null);
+  const [riskLevel, setRiskLevel] = useState('WATCH');
   const [signed, setSigned] = useState(null);
   const left = useCountdown(signed?.expires_at, () => setSigned(null));
   const revealed = !!signed && left > 0;
@@ -219,10 +220,12 @@ function ProfileDrawer({ s, onClose }) {
       if (kind === 'reveal') { setSigned(await call(requestOriginalImage, s.subject_id, reason)); toast('Đã mở ảnh gốc trong 60 giây', 'Lượt xem đã ghi nhật ký với mã VIEW_ORIGINAL_IMAGE.', 'warn'); }
       if (kind === 'lock' || kind === 'unlock' || kind === 'activate') {
         const r = await call(setValidity, s.subject_id, kind.toUpperCase(), reason);
-        toast({ lock: 'Đã khóa hồ sơ', unlock: 'Đã mở khóa hồ sơ', activate: 'Đã kích hoạt hiệu lực' }[kind], r.event ? `Đã gửi cập nhật tới ${r.event.payload.devices} thiết bị kiểm soát ra vào.` : s.code, 'success');
+        toast({ lock: 'Đã khóa hồ sơ', unlock: 'Đã mở khóa hồ sơ', activate: 'Đã kích hoạt hiệu lực' }[kind], r.event ? `${r.event.payload.operation === 'DELETE_TEMPLATE' ? 'Đã gửi lệnh xóa mẫu' : 'Đã gửi mẫu mã hóa'} tới ${r.event.payload.devices.length} thiết bị kiểm soát ra vào.` : s.code, 'success');
       }
       if (kind === 'revoke') { const r = await call(createRequest, s.subject_id, 'REVOKE', reason); toast('Đã tạo yêu cầu thu hồi', `${r.request_id} cần ${r.two_person ? '2 cán bộ' : 'người duyệt'} xác nhận.`, 'warn'); }
       if (kind === 'rescan') { const r = await call(createRequest, s.subject_id, 'RESCAN', reason); toast('Đã tạo yêu cầu chụp lại', `${r.request_id} đã vào Hộp yêu cầu.`, 'success'); }
+      if (kind === 'flag') { const r = await call(flagRisk, s.subject_id, riskLevel, reason); toast('Đã gắn cờ rủi ro', r.event ? `Đã báo trực an ninh qua ${r.event.transport === 'RABBITMQ' ? 'RabbitMQ' : r.event.transport} (${r.event.event_id}).` : 'Sự kiện báo rủi ro đang tắt trong chính sách.', 'warn'); }
+      if (kind === 'unflag') { await call(clearRisk, s.subject_id, reason); toast('Đã gỡ cờ rủi ro', s.code, 'success'); }
       if (kind === 'reconsent') { log(`Gửi yêu cầu xác nhận điều khoản v1.2 — ${reason}`, s.code, 'CONSENT_RECONFIRM_REQUESTED'); toast('Đã gửi yêu cầu xác nhận', `${s.name} sẽ nhận thông báo trên App MyDaiNam.`, 'success'); }
     } catch (e) { toast('Không thực hiện được', e.message, 'error'); }
     setAsk(null);
@@ -285,7 +288,11 @@ function ProfileDrawer({ s, onClose }) {
             <div className="p-2.5 rounded-lg bg-surface-bright"><dt className="text-caption text-text-secondary">Điểm AI</dt><dd className={`font-semibold ${s.ai_score != null ? scoreColor(s.ai_score) : ''}`}>{s.ai_score != null ? `${s.ai_score}/100` : '—'}</dd></div>
             <div className="p-2.5 rounded-lg bg-surface-bright"><dt className="text-caption text-text-secondary">Ngưỡng tự duyệt</dt><dd className="font-semibold">{pol.config.biometric.ai_auto_approve_enabled ? `${pol.config.biometric.ai_auto_approve_threshold}%` : 'Tắt'}</dd></div>
           </dl>
-          {s.risk_flags.length > 0 && <ul className="mt-2 flex flex-col gap-1">{s.risk_flags.map((f) => <li key={f} className="text-body-sm text-status-rejected flex items-center gap-1.5"><Icon name="flag" size={16} />{f}</li>)}</ul>}
+          {s.risk_flags.length > 0 && <ul className="mt-2 flex flex-col gap-1">{s.risk_flags.map((f, i) => <li key={`${i}-${f}`} className={`text-body-sm flex items-center gap-1.5 ${s.states.risk === 'HIGH' ? 'text-status-rejected' : 'text-status-pending'}`}><Icon name="flag" size={16} />{f}</li>)}</ul>}
+          <div className="mt-2 flex gap-2">
+            <button className="btn-outline btn-sm" disabled={!(can('lock') || writable)} onClick={() => { setRiskLevel('WATCH'); setAsk('flag'); }}><Icon name="flag" size={16} />Gắn cờ rủi ro</button>
+            {s.states.risk !== 'NONE' && <button className="btn-outline btn-sm" disabled={!can('security')} title={!can('security') ? 'Chỉ trực an ninh được gỡ cờ' : undefined} onClick={() => setAsk('unflag')}><Icon name="outlined_flag" size={16} />Gỡ cờ</button>}
+          </div>
         </section>
 
         {s.rescan_grant && s.states.request === 'RESCAN_GRANTED' && (
@@ -333,11 +340,18 @@ function ProfileDrawer({ s, onClose }) {
         <p className="text-caption text-text-secondary text-center mt-2">{writable ? 'Thao tác của cán bộ được ký số và ghi nhật ký.' : 'Vai trò hiện tại chỉ được xem.'}</p>
       </div>
 
-      <ConfirmReason open={!!ask} onClose={() => setAsk(null)} onConfirm={(r) => act(ask, r)} danger={['revoke', 'lock'].includes(ask)}
-        title={{ reveal: 'Xem ảnh gốc', lock: 'Khóa hồ sơ', unlock: 'Mở khóa hồ sơ', activate: 'Kích hoạt hiệu lực', revoke: 'Thu hồi quyền Face ID', rescan: 'Tạo yêu cầu chụp lại', reconsent: 'Gửi yêu cầu xác nhận điều khoản' }[ask]}
+      <ConfirmReason open={!!ask} onClose={() => setAsk(null)} onConfirm={(r) => act(ask, r)} danger={['revoke', 'lock', 'flag'].includes(ask)}
+        title={{ reveal: 'Xem ảnh gốc', lock: 'Khóa hồ sơ', unlock: 'Mở khóa hồ sơ', activate: 'Kích hoạt hiệu lực', revoke: 'Thu hồi quyền Face ID', rescan: 'Tạo yêu cầu chụp lại', reconsent: 'Gửi yêu cầu xác nhận điều khoản', flag: 'Gắn cờ rủi ro', unflag: 'Gỡ cờ rủi ro' }[ask]}
+        reasonLabel={ask === 'flag' ? 'Dấu hiệu quan sát được' : undefined} placeholder={ask === 'flag' ? 'Ví dụ: Khuôn mặt tại cổng không khớp ảnh hồ sơ, nghi mượn thẻ…' : undefined}
         subtitle={`${s.name} • ${s.code}`} minLength={ask === 'reveal' ? 5 : 10}>
         {ask === 'reveal' && <Banner tone="warn">Ảnh mở qua link có thời hạn 60 giây, sau đó tự làm mờ lại. Lượt xem được ghi bất biến với mã VIEW_ORIGINAL_IMAGE.</Banner>}
         {['lock', 'unlock', 'activate'].includes(ask) && <Banner>Quyền nhận diện tại cổng và camera thuộc {pol.config.spatial.zones.length} khu vực của {pol.policy_id} được cập nhật ngay.</Banner>}
+        {ask === 'flag' && (
+          <>
+            <Select label="Mức rủi ro" value={riskLevel} onChange={setRiskLevel} options={[{ value: 'WATCH', label: 'Cần theo dõi' }, { value: 'HIGH', label: 'Rủi ro cao' }]} />
+            <Banner tone="warn">Cờ được gửi ngay tới trực an ninh (sự kiện “Báo cờ rủi ro”). Hệ thống không tự khóa hồ sơ; cờ rủi ro cao sẽ chặn mở khóa và kích hoạt cho đến khi gỡ.</Banner>
+          </>
+        )}
         {ask === 'revoke' && <Banner tone="danger">{pol.config.workflow.revoke_two_person ? 'Thu hồi cần 2 cán bộ khác nhau xác nhận.' : 'Thu hồi cần người duyệt xác nhận.'} Yêu cầu sẽ chuyển sang Hộp yêu cầu.</Banner>}
         {ask === 'rescan' && <Banner>Khi được duyệt, {s.name} được chụp lại qua {pol.config.biometric.rescan_channels.map((c) => (c === 'APP' ? 'App MyDaiNam' : 'Kiosk')).join(', ')} trong {pol.config.biometric.rescan_validity_hours} giờ, {pol.config.biometric.rescan_max_uses} lần.</Banner>}
       </ConfirmReason>
