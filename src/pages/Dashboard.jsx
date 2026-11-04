@@ -1,16 +1,8 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Icon, PageHeader } from '../components/ui';
+import { Icon, Chip, MetricStrip, PageHeader } from '../components/ui';
 import { useApp } from '../store';
-import { SOC_EVENTS, DEVICES } from '../data/mock';
-
-const Metric = ({ label, value, sub, alert }) => (
-  <div className="px-space-md py-3.5">
-    <div className="text-caption text-text-secondary">{label}</div>
-    <div className="text-[26px] font-semibold leading-8 mt-1 tabular-nums">{value}</div>
-    <div className={`text-caption mt-0.5 ${alert ? 'text-status-pending font-medium' : 'text-text-secondary'}`}>{sub}</div>
-  </div>
-);
+import { RECORDING_META, SCHEDULE, SOC_EVENTS, DEVICES } from '../data/mock';
 
 const LEVEL = {
   critical: { label: 'Nghiêm trọng', icon: 'error', color: 'text-status-rejected' },
@@ -21,8 +13,8 @@ function AttentionList({ items }) {
   return (
     <div className="flex flex-col divide-y divide-border-subtle border-t border-border-subtle">
       {items.map((it) => (
-        <Link key={it.key} to={it.to} className="grid grid-cols-[112px_1fr_auto_16px] items-center gap-3 px-space-md py-2.5 hover:bg-surface-container-low">
-          <span className={`flex items-center gap-1.5 text-label-sm ${LEVEL[it.level].color}`}><Icon name={LEVEL[it.level].icon} size={15} />{LEVEL[it.level].label}</span>
+        <Link key={it.key} to={it.to} className="grid grid-cols-[116px_1fr_auto_16px] items-center gap-3 min-h-[60px] px-space-md py-2.5 hover:bg-surface-container-low -outline-offset-2">
+          <span className={`flex items-center gap-1.5 text-label-sm ${LEVEL[it.level].color}`}><Icon name={LEVEL[it.level].icon} size={16} />{LEVEL[it.level].label}</span>
           <span className="min-w-0">
             <span className="block text-label-md font-semibold truncate">{it.title}</span>
             <span className="block text-caption text-text-secondary truncate">{it.meta}</span>
@@ -87,11 +79,11 @@ function AttendanceChart() {
 }
 
 const PIPELINE = [
-  ['Thu thập', 'App MyDaiNam (selfie) • Camera/Kiosk chuyên dụng'],
-  ['Quality Gating', 'Độ sáng, góc nghiêng, Liveness / Anti-spoofing'],
-  ['Trích xuất vector', 'SCRFD + ArcFace → Embedding 512d (AES-256, pgvector)'],
-  ['Policy Engine (PDP)', 'Đối tượng + Không gian + Thời gian (Redis Streams)'],
-  ['Hành động', 'Điểm danh / Ghi hình bài giảng / Cảnh báo SOC ≤2s'],
+  ['Thu thập', 'App MyDaiNam (selfie), camera và kiosk chuyên dụng'],
+  ['Kiểm tra chất lượng ảnh', 'Độ sáng, góc nghiêng, kiểm tra người thật'],
+  ['Trích xuất đặc trưng', 'Chuyển ảnh thành vector 512 chiều, mã hóa AES-256'],
+  ['Đối chiếu quy tắc', 'Đối tượng + không gian + thời gian'],
+  ['Hành động', 'Điểm danh, ghi hình bài giảng, cảnh báo an ninh trong 2 giây'],
 ];
 
 export default function Dashboard() {
@@ -108,20 +100,20 @@ export default function Dashboard() {
   return (
     <div>
       <PageHeader title="Tổng quan hệ thống" desc={`Phạm vi: ${scope.tenant} • ${scope.unit}`}
-        actions={<Link to="/kiosk" className="btn-outline"><Icon name="photo_camera_front" size={16} />Mở Kiosk trạm chụp</Link>} />
+        actions={<Link to="/kiosk" className="btn-outline"><Icon name="photo_camera_front" />Mở Kiosk trạm chụp</Link>} />
 
-      <div className="card grid grid-cols-4 divide-x divide-border-subtle mb-space-md">
-        <Metric label="Hồ sơ Face ID đã thu thập" value="23,430" sub="94.3% / 24,850 đối tượng" />
-        <Metric label="Tỉ lệ điểm danh hôm nay" value="95.2%" sub="PRESENT 11,842 • LATE 412" />
-        <Metric label="Yêu cầu chờ duyệt" value={pendingList.length} sub={urgent.length ? `${urgent.length} yêu cầu sắp quá SLA` : 'Trong hạn SLA'} alert={urgent.length > 0} />
-        <Metric label="Thiết bị trực tuyến" value={`${DEVICES.length - offline.length}/${DEVICES.length}`} sub={offline.length ? `${offline.length} thiết bị mất kết nối` : 'Tất cả trực tuyến'} alert={offline.length > 0} />
-      </div>
+      <MetricStrip className="mb-space-md" items={[
+        { label: 'Hồ sơ Face ID đã thu thập', value: '23,430', sub: '94.3% / 24,850 đối tượng', to: '/ho-so' },
+        { label: 'Tỉ lệ điểm danh hôm nay', value: '95.2%', sub: 'Có mặt 11,842 • Đi muộn 412', to: '/thoi-khoa-bieu' },
+        { label: 'Yêu cầu chờ duyệt', value: pendingList.length, sub: urgent.length ? `${urgent.length} yêu cầu sắp quá hạn` : 'Tất cả còn trong hạn', alert: urgent.length > 0, to: '/yeu-cau' },
+        { label: 'Thiết bị trực tuyến', value: `${DEVICES.length - offline.length}/${DEVICES.length}`, sub: offline.length ? `${offline.length} thiết bị mất kết nối` : 'Tất cả trực tuyến', alert: offline.length > 0, to: '/thiet-bi' },
+      ]} />
 
       <div className="grid grid-cols-12 gap-space-md items-start">
-        <section className="col-span-7 card">
-          <div className="flex items-baseline justify-between px-space-md py-3">
+        <section className="col-span-7 card overflow-hidden">
+          <div className="flex items-center justify-between h-12 px-space-md">
             <h2 className="text-headline-md">Cần xử lý <span className="ml-1 font-normal text-text-secondary tabular-nums">{attention.length}</span></h2>
-            <Link to="/soc" className="text-caption text-primary-container hover:underline">Mở SOC</Link>
+            <Link to="/soc" className="text-label-sm text-primary-container hover:underline">Xem trang An ninh</Link>
           </div>
           <AttentionList items={attention} />
         </section>
@@ -129,20 +121,49 @@ export default function Dashboard() {
         <section className="col-span-5 card p-space-md">
           <h2 className="text-headline-md mb-2">Tỉ lệ điểm danh 7 ngày</h2>
           <AttendanceChart />
-          <p className="text-caption text-text-secondary mt-1">Trục tung từ 80%. Chủ nhật không có lịch học. Nguồn: Policy Engine.</p>
+          <p className="text-caption text-text-secondary mt-1">Trục tung bắt đầu từ 80%. Chủ nhật không có lịch học.</p>
         </section>
 
-        <section className="col-span-12 card">
-          <h2 className="text-headline-md px-space-md py-3 border-b border-border-subtle">Luồng dữ liệu SACIP</h2>
-          <ol className="grid grid-cols-5 divide-x divide-border-subtle">
-            {PIPELINE.map(([t, d]) => (
+        <section className="col-span-12 card overflow-hidden">
+          <div className="flex items-center justify-between h-12 px-space-md">
+            <h2 className="text-headline-md">Lịch học hôm nay</h2>
+            <Link to="/thoi-khoa-bieu" className="text-label-sm text-primary-container hover:underline">Xem toàn bộ</Link>
+          </div>
+          <div className="overflow-x-auto border-t border-border-subtle">
+            <table className="data-table">
+              <thead><tr>{['Khung giờ', 'Phòng', 'Học phần', 'Giảng viên', 'Có mặt', 'Đi muộn', 'Vắng', 'Ghi hình bài giảng'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+              <tbody>
+                {SCHEDULE.map((s) => (
+                  <tr key={`${s.slot}-${s.room}`}>
+                    <td className="whitespace-nowrap">{s.slot}</td>
+                    <td className="font-mono">{s.room}</td>
+                    <td><span className="font-medium">{s.course}</span> <span className="text-caption text-text-secondary">{s.cls}</span></td>
+                    <td className="whitespace-nowrap">{s.lecturer}</td>
+                    <td className="tabular-nums">{s.present}</td>
+                    <td className="tabular-nums">{s.late}</td>
+                    <td className="tabular-nums">{s.absent}</td>
+                    <td><Chip color={RECORDING_META[s.recording][0]}>{RECORDING_META[s.recording][1]}</Chip></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <details className="col-span-12 card group">
+          <summary className="h-12 px-space-md flex items-center justify-between cursor-pointer list-none text-label-md font-semibold">
+            Cách hệ thống xử lý dữ liệu
+            <Icon name="expand_more" size={20} className="text-text-secondary transition-transform group-open:rotate-180" />
+          </summary>
+          <ol className="grid grid-cols-5 divide-x divide-border-subtle border-t border-border-subtle">
+            {PIPELINE.map(([t, d], i) => (
               <li key={t} className="px-space-md py-3">
-                <div className="text-label-md font-semibold">{t}</div>
+                <div className="text-label-md font-semibold">{i + 1}. {t}</div>
                 <p className="text-caption text-text-secondary mt-0.5">{d}</p>
               </li>
             ))}
           </ol>
-        </section>
+        </details>
       </div>
     </div>
   );

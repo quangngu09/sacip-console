@@ -8,11 +8,11 @@ export const SUBJECT_TYPES = ['Đối tượng: Tất cả', 'Sinh viên', 'Gi�
 
 export const PROFILES = [
   { id: 'SV-2023-8891', name: 'Nguyễn Hoàng Nam', email: 'nam.nh23@student.edu.vn', type: 'Sinh viên', unit: 'Khoa CNTT', source: 'App MyDaiNam', status: 'collected', validity: '30/06/2027', score: 98, risk: null, seed: 1 },
-  { id: 'SV-2024-1102', name: 'Lê Minh Khôi', email: 'khoi.lm24@student.edu.vn', type: 'Sinh viên', unit: 'Khoa Kinh tế & QTKD', source: 'App MyDaiNam', status: 'quality', validity: 'Chờ chụp lại', score: 64, risk: 'Góc nghiêng > 20°', seed: 2 },
+  { id: 'SV-2024-1102', name: 'Lê Minh Khôi', email: 'khoi.lm24@student.edu.vn', type: 'Sinh viên', unit: 'Khoa Kinh tế & QTKD', source: 'App MyDaiNam', status: 'quality', validity: 'Chờ chụp lại', score: 64, risk: 'Góc nghiêng > 20°', aiHint: 'Vùng trán bị chói 38% và đầu nghiêng 22°. Khuyến nghị yêu cầu chụp lại tại Kiosk 01 hoặc 02.', seed: 2 },
   { id: 'GV-2018-042', name: 'TS. Trần Thị Thu Thảo', email: 'thao.ttt@uni.edu.vn', type: 'Giảng viên', unit: 'Viện ĐT Quốc tế', source: 'Nhập tại quầy', status: 'collected', validity: '31/12/2028', score: 95, risk: null, seed: 3 },
   { id: 'KTX-2023-441', name: 'Phạm Quốc Bảo', email: 'bao.pq@dorm.uni.edu.vn', type: 'Cư dân KTX', unit: 'KTX Tòa B (P.402)', source: 'Ảnh thẻ kiosk', status: 'collected', validity: 'Sắp hết hạn (15 ngày)', expiring: true, score: 91, risk: null, seed: 4 },
   { id: 'NV-2022-019', name: 'Vũ Thị Mai Anh', email: 'maianh.vt@staff.edu.vn', type: 'Cán bộ', unit: 'Phòng Hành chính - QT', source: 'Ảnh thẻ kiosk', status: 'pending', validity: 'Chờ kích hoạt', score: 89, risk: null, seed: 5 },
-  { id: 'EXT-2024-008', name: 'Đoàn Văn Hùng', email: 'hung.dv@vendingpartner.vn', type: 'NV thuê ngoài', unit: 'Đơn vị Căn-tin', source: 'Nhập tại quầy', status: 'locked', validity: 'Đã vô hiệu hóa', score: 48, risk: 'Nguy cơ ảnh in (Spoofing)', seed: 6 },
+  { id: 'EXT-2024-008', name: 'Đoàn Văn Hùng', email: 'hung.dv@vendingpartner.vn', type: 'NV thuê ngoài', unit: 'Đơn vị Căn-tin', source: 'Nhập tại quầy', status: 'locked', validity: 'Đã vô hiệu hóa', score: 48, risk: 'Nghi dùng ảnh in', seed: 6 },
   { id: 'SV-2024-9912', name: 'Hoàng Đỗ Gia Hân', email: 'giahan.hd24@student.edu.vn', type: 'Sinh viên', unit: 'Khoa Ngoại ngữ', source: null, status: 'none', validity: null, score: null, risk: null, seed: 7 },
   { id: 'SV-2023-5521', name: 'Trịnh Bảo Ngọc', email: 'ngoc.tb23@student.edu.vn', type: 'Sinh viên', unit: 'Khoa CNTT', source: 'Camera cổng', status: 'collected', validity: '30/06/2027', score: 93, risk: null, seed: 8 },
   { id: 'GV-2020-117', name: 'ThS. Nguyễn Văn An', email: 'an.nv@uni.edu.vn', type: 'Giảng viên', unit: 'Khoa Kinh tế & QTKD', source: 'Nhập tại quầy', status: 'collected', validity: '31/12/2027', score: 96, risk: null, seed: 9 },
@@ -29,7 +29,7 @@ export const STATUS_META = {
 
 export const REQUESTS = [
   {
-    id: 'YC-2025-0842', kind: 'rescan', kindLabel: 'Rescan Kiosk', status: 'pending', priority: 'Cao', sla: 'Còn 03h 45m', slaUrgent: false,
+    id: 'YC-2025-0842', kind: 'rescan', kindLabel: 'Chụp lại tại Kiosk', status: 'pending', priority: 'Cao', sla: 'Còn 03h 45m', slaUrgent: false,
     name: 'Lê Minh Khôi', initials: 'MK', subjectId: 'SV-2024-1102', unit: 'Khoa Kinh tế & QTKD', cls: 'K66-QTKD-A', time: '2 giờ trước', created: '14:20 24/10/2025',
     note: 'Em đi chụp ảnh tại Kiosk số 03 vào sáng nay nhưng hệ thống báo ảnh chói trán (specular glare) và góc chụp lệch 22 độ nên camera nhận diện thư viện và cửa phòng thi không khớp. Kính đề nghị Phòng Đào tạo mở lại quyền để em chụp lại tại trạm Kiosk.',
     ai: { quality: 64, match: 94.2, liveness: 99.4, confidence: 98.6, verdict: 'Hồ sơ gặp lỗi ngoại cảnh khi chụp tại Kiosk số 03 (đèn trần phản quang trên trán, nghiêng đầu 22°). Khuyến nghị CHẤP THUẬN cấp quyền chụp lại tại Kiosk 01 hoặc 02. Quyết định cuối cùng thuộc về cán bộ Phòng Đào tạo.' },
@@ -129,3 +129,9 @@ export const CONSENTS = [
   { id: 'EXT-2024-008', name: 'Đoàn Văn Hùng', purpose: 'Ra vào khu căng tin', signed: '01/03/2024', channel: 'Nhập tại quầy', state: 'expired' },
   { id: 'SV-2024-9912', name: 'Hoàng Đỗ Gia Hân (K24)', purpose: '—', signed: '—', channel: '—', state: 'none' },
 ];
+
+export const RECORDING_META = {
+  done: ['status-active', 'Đã ghi xong'],
+  live: ['status-rejected', 'Đang ghi'],
+  blocked: ['status-inactive', 'Không ghi: phòng chưa duyệt'],
+};

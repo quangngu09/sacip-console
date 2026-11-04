@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Icon, Chip, StatusDot, ScoreBar, FaceThumb, Drawer, ConfirmReason, AiCard, Empty } from '../components/ui';
+import { Icon, Chip, StatusDot, ScoreBar, FaceThumb, Drawer, ConfirmReason, AiCard, Empty, PageHeader, SearchInput, Select, Tabs } from '../components/ui';
 import { useApp } from '../store';
 import { STATUS_META } from '../data/mock';
 
@@ -11,199 +11,163 @@ const VIEWS = [
   { key: 'expiring', label: 'Sắp hết hạn', count: '115', f: (p) => p.expiring, tone: 'status-pending' },
 ];
 
-const typeColor = { 'Sinh viên': 'primary', 'Giảng viên': 'secondary', 'Cư dân KTX': 'primary', 'Cán bộ': 'neutral', 'NV thuê ngoài': 'status-inactive' };
+const STATUS_OPTIONS = [{ value: 'all', label: 'Tất cả trạng thái' }, ...Object.entries(STATUS_META).map(([value, m]) => ({ value, label: m.label }))];
+const VALIDITY_OPTIONS = [{ value: 'all', label: 'Tất cả hiệu lực' }, { value: 'valid', label: 'Còn hiệu lực' }, { value: 'expiring', label: 'Sắp hết hạn' }, { value: 'waiting', label: 'Đang chờ xử lý' }, { value: 'off', label: 'Đã vô hiệu hóa' }, { value: 'blank', label: 'Chưa có' }];
+const RISK_OPTIONS = [{ value: 'all', label: 'Tất cả rủi ro' }, { value: 'yes', label: 'Có cờ rủi ro' }, { value: 'no', label: 'Không có cờ' }];
+const NO_FILTERS = { status: 'all', validity: 'all', source: 'all', risk: 'all' };
+
+const matchValidity = (p, v) => ({
+  all: true,
+  valid: p.expiring || /^\d{2}\/\d{2}\/\d{4}$/.test(p.validity || ''),
+  expiring: !!p.expiring,
+  waiting: /^Chờ/.test(p.validity || ''),
+  off: p.status === 'locked',
+  blank: !p.validity,
+})[v];
+
+const validityClass = (p) => (p.status === 'locked' ? 'text-status-rejected font-medium' : p.expiring || p.status === 'quality' ? 'text-status-pending font-medium' : p.validity ? '' : 'text-text-secondary');
+
+const BULK = [
+  { key: 'rescan', icon: 'replay', label: 'Yêu cầu chụp lại' },
+  { key: 'activate', icon: 'check_circle', label: 'Kích hoạt hiệu lực' },
+  { key: 'policy', icon: 'vpn_key', label: 'Gán quyền truy cập' },
+  { key: 'notify', icon: 'forward_to_inbox', label: 'Gửi thông báo' },
+  { key: 'lock', icon: 'block', label: 'Khóa tạm thời', danger: true },
+];
 
 export default function Profiles() {
   const { profiles, setProfiles, log, toast, scope } = useApp();
   const [view, setView] = useState('all');
   const [q, setQ] = useState('');
-  const [selected, setSelected] = useState(new Set(['SV-2023-8891', 'SV-2024-1102', 'KTX-2023-441']));
-  const [chips, setChips] = useState(['Khóa K2021-K2024', 'Đang theo học']);
+  const [filters, setFilters] = useState(NO_FILTERS);
+  const [selected, setSelected] = useState(new Set());
   const [detail, setDetail] = useState(null);
   const [bulk, setBulk] = useState(null);
-  const [aiDismissed, setAiDismissed] = useState(false);
+
+  const sourceOptions = useMemo(() => [{ value: 'all', label: 'Tất cả nguồn' }, ...[...new Set(profiles.map((p) => p.source).filter(Boolean))].map((s) => ({ value: s, label: s })), { value: 'blank', label: 'Chưa có nguồn' }], [profiles]);
 
   const rows = useMemo(() => {
     const v = VIEWS.find((x) => x.key === view);
     const subj = scope.subject.startsWith('Đối tượng') ? null : scope.subject;
-    return profiles.filter(v.f).filter((p) => !subj || p.type === subj).filter((p) => !q || `${p.id} ${p.name} ${p.email}`.toLowerCase().includes(q.toLowerCase()));
-  }, [profiles, view, q, scope.subject]);
+    const f = filters;
+    return profiles.filter(v.f)
+      .filter((p) => !subj || p.type === subj)
+      .filter((p) => f.status === 'all' || p.status === f.status)
+      .filter((p) => matchValidity(p, f.validity))
+      .filter((p) => f.source === 'all' || (f.source === 'blank' ? !p.source : p.source === f.source))
+      .filter((p) => f.risk === 'all' || (f.risk === 'yes' ? !!p.risk : !p.risk))
+      .filter((p) => !q || `${p.id} ${p.name} ${p.email}`.toLowerCase().includes(q.toLowerCase()));
+  }, [profiles, view, q, scope.subject, filters]);
+
+  const narrowed = view !== 'all' || !!q || !!Object.values(filters).find((x) => x !== 'all') || !scope.subject.startsWith('Đối tượng');
+  const canReset = view !== 'all' || !!q || !!Object.values(filters).find((x) => x !== 'all');
+  const reset = () => { setFilters(NO_FILTERS); setView('all'); setQ(''); };
+  const setFilter = (k) => (v) => setFilters((f) => ({ ...f, [k]: v }));
 
   const allChecked = rows.length > 0 && rows.every((r) => selected.has(r.id));
   const toggle = (id) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAll = () => setSelected(allChecked ? new Set() : new Set(rows.map((r) => r.id)));
-
-  const BULK = [
-    { key: 'rescan', icon: 'replay', label: 'Yêu cầu chụp lại' },
-    { key: 'activate', icon: 'check_circle', label: 'Kích hoạt hiệu lực' },
-    { key: 'policy', icon: 'vpn_key', label: 'Gán chính sách truy cập' },
-    { key: 'lock', icon: 'block', label: 'Khóa tạm thời', danger: true },
-    { key: 'notify', icon: 'forward_to_inbox', label: 'Gửi thông báo' },
-  ];
+  const open = (p) => { setDetail(p); log('Mở xem chi tiết hồ sơ', p.id, 'view'); };
 
   const runBulk = (reason) => {
     const ids = [...selected];
     if (bulk.key === 'lock') setProfiles((ps) => ps.map((p) => (selected.has(p.id) ? { ...p, status: 'locked', validity: 'Đã vô hiệu hóa' } : p)));
     if (bulk.key === 'activate') setProfiles((ps) => ps.map((p) => (selected.has(p.id) && p.status === 'pending' ? { ...p, status: 'collected', validity: '30/06/2027' } : p)));
     log(`${bulk.label} (hàng loạt: ${ids.length} hồ sơ) — ${reason}`, ids.join(', '));
-    toast(bulk.label, `Đã áp dụng cho ${ids.length} hồ sơ. Đã ghi vào Audit Trail.`, 'success');
+    toast(bulk.label, `Đã áp dụng cho ${ids.length} hồ sơ và ghi vào nhật ký kiểm toán.`, 'success');
     setBulk(null);
     setSelected(new Set());
   };
 
   return (
-    <div className="flex flex-col gap-space-md">
-      {/* Privacy banner */}
-      <div className="p-space-sm bg-surface-container-low rounded-xl flex items-center justify-between shadow-soft">
-        <div className="flex items-center gap-space-sm">
-          <div className="w-8 h-8 rounded-lg bg-primary-container/10 flex items-center justify-center text-primary-container"><Icon name="encrypted" size={20} /></div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-label-md font-semibold">Quy chuẩn Bảo vệ Dữ liệu Cá nhân & Sinh trắc học (Nghị định 13/2023/NĐ-CP)</span>
-              <Chip color="status-active">Vector 512d mã hóa AES-256</Chip>
-            </div>
-            <p className="text-caption text-text-secondary">Admin Core chỉ lưu ánh xạ Person_ID ↔ Vector Embedding (pgvector). Mọi thao tác giải mờ hoặc trích xuất đều tạo bản ghi kiểm toán bất biến.</p>
-          </div>
-        </div>
-        <span className="text-caption text-ai-border flex items-center gap-1 shrink-0"><Icon name="verified_user" size={16} />Phiên kiểm toán: #AUD-2025-90412</span>
-      </div>
+    <div className="page-fill flex flex-col">
+      <PageHeader title="Hồ sơ Face ID" desc="Ảnh luôn được làm mờ; xem rõ phải nêu lý do và được ghi nhật ký (NĐ 13/2023)."
+        actions={<>
+          <button className="btn-outline" onClick={() => { log('Xuất danh sách kiểm toán (không kèm ảnh)', 'Hồ sơ Face ID'); toast('Đã tạo danh sách kiểm toán', 'Tệp chỉ chứa thông tin hồ sơ, không có ảnh khuôn mặt.', 'success'); }}><Icon name="download" />Xuất danh sách</button>
+          <button className="btn-outline" onClick={() => toast('Đồng bộ IAM', 'Đã đồng bộ vòng đời định danh từ IAM (nhập học / bảo lưu / thôi học).', 'success')}><Icon name="sync" />Đồng bộ IAM</button>
+          <button className="btn-primary" onClick={() => toast('Thêm hồ sơ', 'Hồ sơ mới được tạo từ IAM; ảnh thu nhận qua App MyDaiNam hoặc Kiosk.')}><Icon name="person_add" />Thêm hồ sơ</button>
+        </>} />
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-baseline gap-space-sm">
-          <h1 className="text-headline-lg">Hồ sơ Face ID</h1>
-          <Chip color="primary" className="text-label-sm">Tổng cộng: 24,850 hồ sơ</Chip>
-        </div>
-        <div className="flex gap-2">
-          <button className="btn-outline" onClick={() => { log('Xuất danh sách kiểm toán (không kèm ảnh)', 'Hồ sơ Face ID'); toast('Đã tạo danh sách kiểm toán', 'Tệp chỉ chứa metadata — không bao gồm ảnh khuôn mặt.', 'success'); }}><Icon name="history_toggle_off" className="text-text-secondary" />Xuất danh sách kiểm toán</button>
-          <button className="btn-outline" onClick={() => toast('Đồng bộ IAM', 'Đã đồng bộ vòng đời định danh từ IAM (nhập học / bảo lưu / thôi học).', 'success')}><Icon name="sync" className="text-text-secondary" />Đồng bộ IAM</button>
-          <button className="btn-primary" onClick={() => toast('Thêm hồ sơ', 'Hồ sơ mới được tạo từ IAM; ảnh thu nhận qua App MyDaiNam hoặc Kiosk.')}><Icon name="person_add" />Thêm mới hồ sơ</button>
-        </div>
-      </div>
+      <div className="card flex-1 min-h-0 flex flex-col overflow-hidden">
+        <Tabs label="Nhóm hồ sơ" className="px-2 border-b border-border-subtle shrink-0" value={view} onChange={setView} items={VIEWS} />
 
-      {/* Saved views */}
-      <div className="flex items-center justify-between bg-surface px-space-sm pt-1 rounded-xl shadow-soft">
-        <div className="flex items-center gap-space-md">
-          {VIEWS.map((v) => (
-            <button key={v.key} onClick={() => setView(v.key)} className={`pb-2.5 pt-1.5 px-space-sm text-label-md whitespace-nowrap flex items-center gap-1.5 border-b-2 ${view === v.key ? 'text-primary-container font-semibold border-primary-container' : 'text-text-secondary border-transparent hover:text-text-primary'}`}>
-              {v.label}
-              <span className={`px-1.5 rounded-full text-caption font-semibold ${{ 'status-pending': 'bg-status-pending/10 text-status-pending', 'status-rejected': 'bg-status-rejected/10 text-status-rejected' }[v.tone] || 'bg-primary-container/10 text-primary-container'}`}>{v.count}</span>
-            </button>
-          ))}
-          <button className="pb-2.5 pt-1.5 px-space-sm text-ai-border text-label-md whitespace-nowrap flex items-center gap-1" onClick={() => toast('Tạo góc nhìn', 'Lưu tổ hợp bộ lọc hiện tại thành tab mới.')}><Icon name="add_circle" size={16} />Tạo góc nhìn</button>
-        </div>
-        <div className="flex items-center gap-2 pb-2">
-          <div className="relative">
-            <Icon name="search" size={16} className="absolute left-2 top-2 text-text-secondary" />
-            <input className="input w-64 h-8 pl-8" placeholder="Tìm theo Mã số, Tên, Email..." value={q} onChange={(e) => setQ(e.target.value)} />
+        {selected.size > 0 ? (
+          <div className="min-h-[64px] px-3 py-2 bg-primary-fixed border-b border-border-subtle flex items-center gap-2 shrink-0 anim-fade" role="region" aria-label="Thao tác hàng loạt">
+            <span className="text-label-md font-semibold text-primary-container mr-2 whitespace-nowrap">Đã chọn {selected.size} hồ sơ</span>
+            {BULK.map((b) => <button key={b.key} onClick={() => setBulk(b)} className={`${b.danger ? 'btn-danger' : 'btn-outline'} btn-sm`}><Icon name={b.icon} size={16} />{b.label}</button>)}
+            <button onClick={() => setSelected(new Set())} className="btn-sm btn ml-auto text-text-secondary hover:bg-surface-container"><Icon name="close" size={16} />Bỏ chọn</button>
           </div>
-          <button className="h-8 px-2 rounded-lg bg-surface-bright hover:bg-surface-container-low text-text-secondary" title="Cột hiển thị"><Icon name="view_column" /></button>
-        </div>
-      </div>
+        ) : (
+          <div className="min-h-[64px] px-3 py-3 border-b border-border-subtle flex items-center gap-2 shrink-0">
+            <SearchInput className="flex-1 min-w-[180px] max-w-sm" value={q} onChange={setQ} placeholder="Tìm theo mã số, tên, email" />
+            <Select className="!w-[158px]" label="Trạng thái" value={filters.status} options={STATUS_OPTIONS} onChange={setFilter('status')} />
+            <Select className="!w-[148px]" label="Hiệu lực" value={filters.validity} options={VALIDITY_OPTIONS} onChange={setFilter('validity')} />
+            <Select className="!w-[148px]" label="Nguồn dữ liệu" value={filters.source} options={sourceOptions} onChange={setFilter('source')} />
+            <Select className="!w-[140px]" label="Cờ rủi ro" value={filters.risk} options={RISK_OPTIONS} onChange={setFilter('risk')} />
+            {canReset && <button className="btn text-text-secondary hover:bg-surface-container-low" onClick={reset}><Icon name="restart_alt" size={16} />Đặt lại</button>}
+          </div>
+        )}
 
-      {/* Filter chips */}
-      <div className="flex flex-wrap items-center gap-space-xs">
-        {[['Trạng thái', 'Tất cả thu thập'], ['Hiệu lực', 'Còn hiệu lực'], ['Nguồn', 'Tất cả nguồn'], ['Cờ rủi ro', 'Tất cả']].map(([k, v]) => (
-          <div key={k} className="h-8 px-2.5 rounded-lg bg-surface hover:bg-surface-container-low text-label-sm shadow-soft flex items-center gap-1.5 cursor-pointer">
-            {k === 'Cờ rủi ro' && <span className="w-1.5 h-1.5 rounded-full bg-status-rejected" />}
-            <span className="text-text-secondary">{k}:</span><span className="font-medium">{v}</span><Icon name="arrow_drop_down" size={16} className="text-text-secondary" />
-          </div>
-        ))}
-        {chips.map((c) => (
-          <div key={c} className="h-8 px-2.5 rounded-full bg-surface text-label-sm shadow-soft flex items-center gap-1.5">
-            <span className="font-medium">{c}</span>
-            <button onClick={() => setChips((cs) => cs.filter((x) => x !== c))} aria-label={`Bỏ lọc ${c}`} className="text-text-secondary hover:text-status-rejected"><Icon name="close" size={16} /></button>
-          </div>
-        ))}
-        <button className="h-8 px-2.5 rounded-lg bg-surface-container-high text-primary-container text-label-sm font-medium flex items-center gap-1"><Icon name="tune" size={16} />+ Bộ lọc nâng cao (AND/OR)</button>
-        <button className="h-8 px-2 text-text-secondary hover:text-status-rejected text-label-sm flex items-center gap-1" onClick={() => { setChips([]); setView('all'); setQ(''); }}><Icon name="restart_alt" size={16} />Đặt lại tất cả</button>
-      </div>
-
-      {/* Bulk bar */}
-      {selected.size > 0 && (
-        <div className="sticky top-16 z-20 p-space-sm bg-primary-container text-white rounded-xl shadow-lg flex items-center justify-between anim-fade">
-          <div className="flex items-center gap-space-md">
-            <span className="flex items-center gap-2 text-label-md font-semibold"><Icon name="check_box" size={20} />Đã chọn {selected.size} hồ sơ</span>
-            <div className="h-4 w-px bg-white/20" />
-            <div className="flex gap-1">
-              {BULK.map((b) => (
-                <button key={b.key} onClick={() => setBulk(b)} className="h-8 px-2.5 rounded-lg bg-white/10 hover:bg-white/20 text-label-sm whitespace-nowrap flex items-center gap-1.5"><Icon name={b.icon} size={16} />{b.label}</button>
-              ))}
-            </div>
-          </div>
-          <div className="flex items-center gap-space-sm">
-            <span className="hidden 2xl:flex text-white/70 text-caption items-center gap-1"><Icon name="shield" size={14} />Không cho phép xuất ảnh hàng loạt</span>
-            <button onClick={() => setSelected(new Set())} className="h-7 px-2 rounded hover:bg-white/20 text-label-sm whitespace-nowrap flex items-center gap-1"><Icon name="close" size={16} />Hủy chọn</button>
-          </div>
-        </div>
-      )}
-
-      {/* AI suggestion */}
-      {!aiDismissed && (
-        <div className="p-space-sm bg-ai-surface border border-ai-border/40 rounded-xl flex items-center justify-between gap-3">
-          <div className="flex items-center gap-space-sm">
-            <div className="w-7 h-7 rounded-lg bg-secondary/10 flex items-center justify-center text-secondary shrink-0"><Icon name="smart_toy" /></div>
-            <p className="text-body-sm">
-              <span className="text-label-md text-secondary font-semibold">Gợi ý của AI – người duyệt quyết định: </span>
-              Hồ sơ <strong>SV-2024-1102 (Lê Minh Khôi)</strong> có độ chói cao ở vùng trán (specular 38%) và góc nghiêng 22°. Khuyến nghị gửi yêu cầu chụp lại tại Kiosk trạm 01/02.
-            </p>
-          </div>
-          <div className="flex gap-1 shrink-0">
-            <button className="h-7 px-2.5 rounded-lg bg-secondary text-white text-label-sm hover:opacity-90" onClick={() => { log('Duyệt gợi ý AI: Yêu cầu chụp lại', 'SV-2024-1102'); toast('Đã tạo yêu cầu chụp lại', 'SV-2024-1102 — quyết định bởi cán bộ duyệt.', 'success'); setAiDismissed(true); }}>Duyệt gợi ý: Yêu cầu chụp lại</button>
-            <button className="h-7 px-2 text-text-secondary hover:text-text-primary text-label-sm" onClick={() => setAiDismissed(true)}>Bỏ qua</button>
-          </div>
-        </div>
-      )}
-
-      {/* Table */}
-      <div className="bg-surface rounded-xl shadow-soft overflow-hidden">
-        <div className="overflow-x-auto max-h-[calc(100vh-260px)]">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-surface-bright sticky top-0 z-10">
-              <tr className="h-10 text-text-secondary text-caption">
-                <th className="w-10 px-3 text-center"><input type="checkbox" checked={allChecked} onChange={toggleAll} className="w-4 h-4 accent-primary-container" aria-label="Chọn tất cả" /></th>
-                {['Mã đối tượng', 'Họ tên & Ảnh Face ID', 'Phân loại', 'Đơn vị / Khoa', 'Nguồn dữ liệu', 'Trạng thái thu thập', 'Thời hạn hiệu lực', 'Điểm AI (ICAO)', 'Cờ rủi ro'].map((h) => <th key={h}>{h}</th>)}
-                <th className="px-3 text-right font-medium">Thao tác</th>
+        <div className="flex-1 min-h-0 overflow-auto">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th className="sticky top-0 left-0 z-20 w-12 !px-2"><label className="w-8 h-8 flex items-center justify-center cursor-pointer"><input type="checkbox" checked={allChecked} onChange={toggleAll} className="w-4 h-4 accent-primary-container" aria-label="Chọn tất cả" /></label></th>
+                <th className="sticky top-0 left-12 z-20 min-w-[230px]">Họ tên và mã số</th>
+                <th className="sticky top-0 z-10">Đơn vị</th>
+                <th className="sticky top-0 z-10 hidden min-[1400px]:table-cell">Nguồn dữ liệu</th>
+                <th className="sticky top-0 z-10">Trạng thái</th>
+                <th className="sticky top-0 z-10">Hiệu lực</th>
+                <th className="sticky top-0 z-10">Điểm ảnh (AI)</th>
+                <th className="sticky top-0 right-0 z-20 text-right">Thao tác</th>
               </tr>
             </thead>
-            <tbody className="text-body-sm">
+            <tbody>
               {rows.map((p) => {
                 const st = STATUS_META[p.status];
+                const canOpen = p.status !== 'none';
                 return (
-                  <tr key={p.id} className={`h-12 hover:bg-surface-container-low transition-colors ${selected.has(p.id) ? 'bg-surface-container-low/60' : ''}`}>
-                    <td className="px-3 text-center"><input type="checkbox" checked={selected.has(p.id)} onChange={() => toggle(p.id)} className="w-4 h-4 accent-primary-container" aria-label={`Chọn ${p.id}`} /></td>
-                    <td className="px-3 font-mono text-label-md font-semibold whitespace-nowrap">{p.id}</td>
-                    <td className="px-3">
+                  <tr key={p.id} onClick={canOpen ? () => open(p) : undefined} className={`h-14 transition-colors ${canOpen ? 'cursor-pointer' : ''} ${selected.has(p.id) ? 'bg-primary-fixed' : 'bg-surface hover:bg-surface-container-low'}`}>
+                    <td className="sticky left-0 z-[5] bg-inherit !px-2" onClick={(e) => e.stopPropagation()}><label className="w-8 h-8 flex items-center justify-center cursor-pointer"><input type="checkbox" checked={selected.has(p.id)} onChange={() => toggle(p.id)} className="w-4 h-4 accent-primary-container" aria-label={`Chọn ${p.id}`} /></label></td>
+                    <td className="sticky left-12 z-[5] bg-inherit">
                       <div className="flex items-center gap-space-sm">
                         <FaceThumb seed={p.seed} missing={p.status === 'none'} />
-                        <div className="min-w-0"><div className="text-label-md font-semibold truncate">{p.name}</div><div className="text-caption text-text-secondary truncate">{p.email}</div></div>
+                        <div className="min-w-0"><div className="text-label-md font-semibold whitespace-nowrap">{p.name}</div><div className="text-caption font-mono text-text-secondary whitespace-nowrap">{p.id}</div></div>
                       </div>
                     </td>
-                    <td className="px-3"><Chip color={typeColor[p.type]} className="text-caption whitespace-nowrap">{p.type}</Chip></td>
-                    <td className="px-3 whitespace-nowrap">{p.unit}</td>
-                    <td className="px-3">{p.source ? <span className="px-2 py-0.5 rounded bg-surface-container text-caption whitespace-nowrap">{p.source}</span> : <span className="text-text-secondary">—</span>}</td>
-                    <td className="px-3 whitespace-nowrap"><StatusDot color={st.color} label={st.label} /></td>
-                    <td className="px-3 text-caption whitespace-nowrap">{p.expiring ? <Chip color="status-pending">{p.validity}</Chip> : <span className={p.status === 'locked' ? 'text-status-rejected font-medium' : p.status === 'quality' ? 'text-status-pending font-medium' : p.validity ? '' : 'text-text-secondary'}>{p.validity || '—'}</span>}</td>
-                    <td className="px-3"><ScoreBar value={p.score} /></td>
-                    <td className="px-3">{p.risk ? <Chip color="status-rejected" icon="warning" className="whitespace-nowrap">{p.risk}</Chip> : <span className="text-caption text-text-secondary whitespace-nowrap">{p.status === 'none' ? 'Chưa chụp ảnh' : 'Không có'}</span>}</td>
-                    <td className="px-3 text-right whitespace-nowrap">
+                    <td><div>{p.unit}</div><div className="text-caption text-text-secondary">{p.type}</div></td>
+                    <td className="hidden min-[1400px]:table-cell whitespace-nowrap">{p.source || <span className="text-text-secondary">Chưa có</span>}</td>
+                    <td>
+                      <StatusDot color={st.color} label={st.label} />
+                      {p.risk && <div className="text-caption text-status-rejected flex items-center gap-1 mt-0.5 whitespace-nowrap"><Icon name="warning" size={13} />{p.risk}</div>}
+                      {p.aiHint && <div className="text-caption text-text-secondary flex items-center gap-1 whitespace-nowrap"><Icon name="info" size={13} />Có gợi ý của AI</div>}
+                    </td>
+                    <td className={`whitespace-nowrap ${validityClass(p)}`}>{p.validity || 'Chưa có'}</td>
+                    <td className="whitespace-nowrap"><ScoreBar value={p.score} /></td>
+                    <td className="sticky right-0 z-[5] bg-inherit text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       {p.status === 'none'
-                        ? <button className="h-8 px-2 rounded hover:bg-surface-container text-primary-container text-label-sm font-medium" onClick={() => { log('Gửi nhắc nhở thu thập Face ID', p.id); toast('Đã gửi nhắc nhở', `${p.name} sẽ nhận thông báo qua App MyDaiNam.`, 'success'); }}>Gửi nhắc nhở</button>
-                        : <button className="h-8 px-2 rounded hover:bg-surface-container text-primary-container text-label-sm font-medium" onClick={() => { setDetail(p); log('Mở xem chi tiết hồ sơ', p.id, 'view'); }}>Chi tiết</button>}
+                        ? <button className="btn-outline btn-sm" onClick={() => { log('Gửi nhắc nhở thu thập Face ID', p.id); toast('Đã gửi nhắc nhở', `${p.name} sẽ nhận thông báo qua App MyDaiNam.`, 'success'); }}>Nhắc nhở</button>
+                        : <button className="btn-outline btn-sm" aria-label={`Xem chi tiết ${p.name}`} onClick={() => open(p)}>Chi tiết</button>}
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-          {rows.length === 0 && <Empty icon="search_off" title="Không có hồ sơ phù hợp" desc="Thử bỏ bớt bộ lọc hoặc thay đổi phạm vi ở thanh trên cùng." />}
+          {rows.length === 0 && (
+            <div className="flex flex-col items-center">
+              <Empty icon="search_off" title="Không có hồ sơ phù hợp" desc="Thử bỏ bớt bộ lọc hoặc đổi phạm vi ở thanh trên cùng." />
+              {canReset && <button className="btn-outline -mt-6 mb-8" onClick={reset}>Đặt lại bộ lọc</button>}
+            </div>
+          )}
         </div>
-        <div className="h-14 px-space-md border-t border-border-subtle flex items-center justify-between text-body-sm text-text-secondary">
-          <span>Hiển thị <strong className="text-text-primary font-medium">1 - {rows.length}</strong> trong tổng số <strong className="text-text-primary font-medium">24,850</strong> hồ sơ</span>
-          <div className="flex items-center gap-1">
-            <button className="h-8 px-2.5 rounded-lg text-status-inactive text-label-sm flex items-center gap-1" disabled><Icon name="chevron_left" size={16} />Trang trước</button>
-            {['1', '2', '3'].map((n) => <button key={n} className={`h-8 w-8 rounded-lg text-label-sm ${n === '1' ? 'bg-primary-container text-white font-semibold' : 'hover:bg-surface-container text-text-primary'}`}>{n}</button>)}
-            <span className="px-1">…</span><button className="h-8 px-2 rounded-lg hover:bg-surface-container text-text-primary font-mono text-label-sm">994</button>
-            <button className="h-8 px-2.5 rounded-lg hover:bg-surface-container text-text-primary text-label-sm flex items-center gap-1">Trang sau<Icon name="chevron_right" size={16} /></button>
+
+        <div className="h-12 px-space-md border-t border-border-subtle flex items-center justify-between text-body-sm text-text-secondary shrink-0">
+          <span aria-live="polite">{narrowed ? <>Tìm thấy <b className="text-text-primary font-medium">{rows.length}</b> hồ sơ</> : <>Hiển thị <b className="text-text-primary font-medium">1–{rows.length}</b> trong tổng số <b className="text-text-primary font-medium">24,850</b> hồ sơ</>}</span>
+          <div className="flex items-center gap-2">
+            <span>Trang 1 / {narrowed ? 1 : 994}</span>
+            <button disabled className="btn-outline btn-sm !px-1.5" aria-label="Trang trước" title="Dữ liệu mẫu chỉ có một trang"><Icon name="chevron_left" /></button>
+            <button disabled className="btn-outline btn-sm !px-1.5" aria-label="Trang sau" title="Dữ liệu mẫu chỉ có một trang"><Icon name="chevron_right" /></button>
           </div>
         </div>
       </div>
@@ -219,7 +183,7 @@ export default function Profiles() {
 
 const POSES = [
   ['Trực diện', 64, 'Chói'], ['Chúc 15°', 88, 'Đạt'], ['Ngửa 15°', 92, 'Đạt'],
-  ['Nghiêng T 20°', 85, 'Đạt'], ['Nghiêng P 20°', 81, 'Ổn'], ['Đỉnh đầu', 90, 'Đạt'],
+  ['Nghiêng trái 20°', 85, 'Đạt'], ['Nghiêng phải 20°', 81, 'Ổn'], ['Đỉnh đầu', 90, 'Đạt'],
 ];
 
 function ProfileDrawer({ profile, onClose }) {
@@ -233,7 +197,7 @@ function ProfileDrawer({ profile, onClose }) {
   const close = () => { setRevealed(false); onClose(); };
 
   const act = (kind, reason) => {
-    if (kind === 'reveal') { setRevealed(true); log(`Xem rõ ảnh khuôn mặt — ${reason}`, profile.id, 'sensitive'); toast('Đã giải mờ ảnh', 'Thao tác đã được ghi vào Audit Trail.', 'warn'); }
+    if (kind === 'reveal') { setRevealed(true); log(`Xem rõ ảnh khuôn mặt — ${reason}`, profile.id, 'sensitive'); toast('Đã giải mờ ảnh', 'Thao tác đã được ghi vào nhật ký kiểm toán.', 'warn'); }
     if (kind === 'lock') { setProfiles((ps) => ps.map((p) => (p.id === profile.id ? { ...p, status: 'locked', validity: 'Đã vô hiệu hóa' } : p))); log(`Khóa hồ sơ — ${reason}`, profile.id); toast('Đã khóa hồ sơ', profile.id, 'success'); close(); }
     if (kind === 'revoke') { log(`Thu hồi quyền Face ID — ${reason}`, profile.id); toast('Đã gửi yêu cầu thu hồi', 'Cần cán bộ thứ 2 xác nhận.', 'warn'); close(); }
     if (kind === 'rescan') { log(`Tạo yêu cầu chụp lại — ${reason}`, profile.id); toast('Đã tạo yêu cầu chụp lại', profile.id, 'success'); close(); }
@@ -241,86 +205,73 @@ function ProfileDrawer({ profile, onClose }) {
   };
 
   return (
-    <Drawer open onClose={close}>
-      <div className="px-space-md py-space-sm border-b border-border-subtle flex flex-col gap-2 shrink-0">
-        <div className="flex items-center justify-between">
-          <span className="flex items-center gap-2 text-label-md font-semibold"><Icon name="badge" size={20} className="text-primary-container" />Chi tiết Hồ sơ Face ID</span>
-          <div className="flex gap-1">
-            <button className="p-1 rounded-lg hover:bg-surface-container-low text-text-secondary" title="In báo cáo"><Icon name="print" /></button>
-            <button className="p-1 rounded-lg hover:bg-surface-container-low text-text-secondary" onClick={close} title="Đóng (Esc)"><Icon name="close" size={20} /></button>
+    <Drawer open onClose={close} width={520}>
+      <div className="px-space-md py-3 border-b border-border-subtle shrink-0">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-k-title-md truncate">{profile.name}</h2>
+            <div className="text-caption text-text-secondary"><span className="font-mono">{profile.id}</span> • {profile.email}</div>
           </div>
+          <button aria-label="Đóng" className="w-8 h-8 rounded flex items-center justify-center text-text-secondary hover:bg-surface-container-low shrink-0" onClick={close}><Icon name="close" size={20} /></button>
         </div>
-        <div className="flex items-start justify-between">
-          <div><div className="flex items-baseline gap-2"><h2 className="text-headline-md font-bold">{profile.name}</h2><span className="font-mono text-label-sm text-text-secondary">{profile.id}</span></div><span className="text-caption text-text-secondary">{profile.unit}</span></div>
-          <Chip color={typeColor[profile.type]} className="text-caption">{profile.type}</Chip>
+        <div className="mt-2 flex items-center justify-between gap-3 text-body-sm">
+          <StatusDot color={STATUS_META[profile.status].color} label={STATUS_META[profile.status].label} />
+          <span className="text-text-secondary">{profile.type} • {profile.unit}</span>
         </div>
-        <div className="flex justify-between text-caption pt-1 border-t border-border-subtle"><StatusDot color={STATUS_META[profile.status].color} label={STATUS_META[profile.status].label} /><span className="text-text-secondary">Đại học Đại Nam</span></div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-space-md flex flex-col gap-space-md">
-        <section className="rounded-xl border border-border-subtle p-space-sm bg-surface-container-low/50">
-          <div className="flex items-center justify-between mb-1">
-            <span className="flex items-center gap-1.5 text-label-md font-semibold"><Icon name="lock" className="text-primary-container" />Dữ liệu ảnh khuôn mặt</span>
-            <span className="px-2 py-0.5 rounded bg-surface-container text-text-secondary font-mono text-caption">6 góc chụp</span>
-          </div>
-          <p className="text-caption text-text-secondary mb-2">Ảnh gốc được làm mờ mặc định. Admin Core chỉ giữ vector đã mã hóa; ảnh hiển thị lấy từ kho đối soát có thời hạn.</p>
-          <div className="mb-2 p-1.5 bg-surface rounded-lg border border-border-subtle flex items-center justify-between">
-            <span className="flex items-center gap-2 text-caption text-text-secondary"><Icon name="shield" className="text-ai-border" />Mở khóa ảnh tạo bản ghi kiểm toán bất biến.</span>
+        {profile.aiHint && <AiCard><p className="text-body-sm">{profile.aiHint}</p></AiCard>}
+
+        <section>
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <h3 className="text-headline-md">Ảnh khuôn mặt <span className="font-normal text-caption text-text-secondary">6 góc chụp</span></h3>
             {revealed
-              ? <button className="h-7 px-2.5 rounded bg-surface-container text-caption font-medium flex items-center gap-1" onClick={() => setRevealed(false)}><Icon name="visibility_off" size={15} />Làm mờ lại</button>
-              : <button className="h-7 px-2.5 rounded bg-primary-container text-white text-caption font-medium whitespace-nowrap shrink-0 flex items-center gap-1" onClick={() => setConfirm('reveal')}><Icon name="visibility" size={15} />Xem rõ (sẽ được ghi log)</button>}
+              ? <button className="btn-outline btn-sm" onClick={() => setRevealed(false)}><Icon name="visibility_off" size={16} />Làm mờ lại</button>
+              : <button className="btn-outline btn-sm" onClick={() => setConfirm('reveal')}><Icon name="visibility" size={16} />Xem rõ (ghi nhật ký)</button>}
           </div>
           <div className="grid grid-cols-3 gap-2">
             {poses.map(([n, s, l], i) => (
-              <div key={n} className="flex flex-col items-center bg-surface p-1.5 rounded-lg border border-border-subtle text-center">
-                <div className="mb-1"><FaceThumb seed={profile.seed + i * 0.15} size={80} round={false} revealed={revealed} /></div>
-                <span className="text-caption font-semibold">{i + 1}. {n}</span>
-                <span className={`text-caption font-medium ${scoreColor(s)}`}>{s}/100 ({l})</span>
+              <div key={n} className="p-2 rounded-lg border border-border-subtle flex flex-col items-center text-center">
+                <FaceThumb seed={profile.seed + i * 0.15} size={88} round={false} revealed={revealed} />
+                <span className="text-caption font-medium mt-1">{n}</span>
+                <span className={`text-caption ${scoreColor(s)}`}>{s}/100 ({l})</span>
               </div>
             ))}
           </div>
         </section>
 
-        <AiCard>
-          <div className="space-y-1.5">
-            {poses.map(([n, s]) => (
-              <div key={n} className="p-2 bg-surface rounded-lg border border-border-subtle flex items-center justify-between text-caption">
-                <span className="flex items-center gap-1.5"><span className={`w-2 h-2 rounded-full ${s >= 85 ? 'bg-status-active' : s >= 70 ? 'bg-status-pending' : 'bg-status-rejected'}`} />{n}: <b className={`font-mono ${scoreColor(s)}`}>{s}/100</b></span>
-                <span className={scoreColor(s)}>{s >= 85 ? 'Đạt chuẩn' : s >= 70 ? 'Chấp nhận được' : 'Lỗi: chói trán 38%, nghiêng 22°'}</span>
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            <div className="p-2 bg-surface rounded-lg border border-border-subtle"><div className="text-caption text-text-secondary">Đối sánh 1:1 CCCD</div><div className="font-mono font-bold text-status-active">94.2%</div></div>
-            <div className="p-2 bg-surface rounded-lg border border-border-subtle"><div className="text-caption text-text-secondary">Liveness / Anti-spoofing</div><div className={`font-mono font-bold ${profile.risk?.includes('Spoof') ? 'text-status-rejected' : 'text-status-active'}`}>{profile.risk?.includes('Spoof') ? 'FAIL (42%)' : 'PASS (99.4%)'}</div></div>
-          </div>
-          <div className="flex justify-between text-caption text-text-secondary pt-2"><span>SCRFD + ArcFace (buffalo_l) • Quality Gating v3.2</span><span className="italic text-secondary">AI khuyến nghị, người duyệt quyết định</span></div>
-        </AiCard>
-
-        <section className="rounded-xl border border-border-subtle p-space-sm">
-          <div className="text-label-md font-semibold mb-2 flex items-center gap-1.5"><Icon name="history" className="text-primary-container" />Lịch sử phiên bản</div>
-          <div className="space-y-3 pl-4 border-l-2 border-border-subtle ml-2 text-caption">
-            <div className="relative"><span className="w-2.5 h-2.5 rounded-full bg-status-pending absolute -left-[22px] top-1" /><b>v2.0 (Hiện tại)</b> <Chip color="status-pending">Chờ duyệt</Chip><div className="text-caption text-text-secondary">14:32 25/10/2025 • Kiosk số 03 (Phiên #TR3-2025-041)</div></div>
-            <div className="relative"><span className="w-2.5 h-2.5 rounded-full bg-status-inactive absolute -left-[22px] top-1" /><span className="text-text-secondary">v1.0 (Lưu trữ)</span><div className="text-caption text-text-secondary">15/09/2023 • App MyDaiNam (đã thay thế)</div></div>
-          </div>
+        <section>
+          <h3 className="text-headline-md mb-2">Kết quả kiểm tra</h3>
+          <dl className="grid grid-cols-2 gap-2">
+            <div className="p-2.5 rounded-lg bg-surface-bright"><dt className="text-caption text-text-secondary">Khớp với ảnh CCCD</dt><dd className="font-semibold text-status-active">94.2%</dd></div>
+            <div className="p-2.5 rounded-lg bg-surface-bright"><dt className="text-caption text-text-secondary">Kiểm tra người thật</dt><dd className={`font-semibold ${profile.risk?.includes('ảnh in') ? 'text-status-rejected' : 'text-status-active'}`}>{profile.risk?.includes('ảnh in') ? 'Không đạt (42%)' : 'Đạt (99.4%)'}</dd></div>
+          </dl>
+          <p className="text-caption text-text-secondary mt-2">AI chỉ khuyến nghị, người duyệt quyết định.</p>
         </section>
 
-        <section className="rounded-xl border border-border-subtle p-space-sm">
-          <div className="text-label-md font-semibold mb-1.5 flex items-center gap-1.5"><Icon name="verified_user" className="text-status-active" />Tình trạng đồng ý (NĐ 13/2023)</div>
-          <div className="p-2 rounded-lg bg-surface-bright border border-border-subtle text-caption space-y-1">
-            <div className="flex justify-between"><span className="font-medium">Cam kết xử lý dữ liệu sinh trắc:</span><Chip color="status-active">Đã ký điện tử</Chip></div>
-            <div className="text-caption text-text-secondary"><b className="text-text-primary">Mục đích hợp lệ:</b> Điểm danh giảng đường, kiểm soát ra vào, phát hành thẻ.</div>
-          </div>
+        <section>
+          <h3 className="text-headline-md mb-2">Lịch sử phiên bản</h3>
+          <ol className="flex flex-col gap-2 text-body-sm">
+            <li><div className="flex items-center gap-2"><b className="font-medium">v2.0 (hiện tại)</b><Chip color="status-pending">Chờ duyệt</Chip></div><div className="text-caption text-text-secondary">14:32 25/10/2025 • Kiosk số 03 (phiên #TR3-2025-041)</div></li>
+            <li><div className="text-text-secondary">v1.0 (lưu trữ)</div><div className="text-caption text-text-secondary">15/09/2023 • App MyDaiNam (đã thay thế)</div></li>
+          </ol>
+        </section>
+
+        <section>
+          <h3 className="text-headline-md mb-1">Đồng ý xử lý dữ liệu (NĐ 13/2023)</h3>
+          <div className="flex items-center gap-2 text-body-sm"><Chip color="status-active">Đã ký điện tử</Chip></div>
+          <p className="text-caption text-text-secondary mt-1">Mục đích: điểm danh giảng đường, kiểm soát ra vào, phát hành thẻ.</p>
         </section>
       </div>
 
-      <div className="p-space-md border-t border-border-subtle flex flex-col gap-2 shrink-0">
+      <div className="p-space-md border-t border-border-subtle shrink-0">
         <div className="flex gap-2">
-          <button className="btn-outline h-9" onClick={() => setConfirm('lock')}><Icon name="lock" size={16} />Khóa</button>
-          <button className="btn h-9 border border-status-rejected/30 text-status-rejected hover:bg-status-rejected/10" onClick={() => setConfirm('revoke')}><Icon name="cancel" size={16} />Thu hồi</button>
-          <button className="btn-primary h-9 flex-1 justify-center" onClick={() => setConfirm('rescan')}><Icon name="add_task" size={16} />Tạo yêu cầu chụp lại</button>
+          <button className="btn-outline" onClick={() => setConfirm('lock')}><Icon name="lock" size={16} />Khóa</button>
+          <button className="btn-danger" onClick={() => setConfirm('revoke')}><Icon name="cancel" size={16} />Thu hồi</button>
+          <button className="btn-primary flex-1" onClick={() => setConfirm('rescan')}><Icon name="add_task" size={16} />Tạo yêu cầu chụp lại</button>
         </div>
-        <div className="text-center text-caption text-text-secondary flex items-center justify-center gap-1"><Icon name="verified" size={13} className="text-ai-border" />Thao tác của cán bộ sẽ được ký số và lưu vết.</div>
+        <p className="text-caption text-text-secondary text-center mt-2">Thao tác của cán bộ sẽ được ký số và lưu vết.</p>
       </div>
 
       <ConfirmReason open={!!confirm} onClose={() => setConfirm(null)} onConfirm={(r) => act(confirm, r)} danger={confirm === 'revoke' || confirm === 'lock'}

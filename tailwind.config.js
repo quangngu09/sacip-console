@@ -36,8 +36,8 @@ export default {
         'border-control': '#8490A0', // Viền ô nhập cần đạt 3:1 trên nền trắng.
         'status-active': '#14733A',
         'status-pending': '#8A6100', // Vàng hổ phách để không lẫn với cam thương hiệu.
-        'status-rejected': '#C01C1C',
-        'status-inactive': '#69737F',
+        'status-rejected': '#B01818',
+        'status-inactive': '#5F6975',
         'status-amber': '#D9A40B',
         'ai-surface': '#F2F4F8',
         'ai-border': '#4A5563',

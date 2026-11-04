@@ -1,12 +1,6 @@
 import { Icon, Chip, PageHeader } from '../components/ui';
 import { useApp } from '../store';
-import { SCHEDULE } from '../data/mock';
-
-const rec = {
-  done: ['status-active', 'Đã có audio sạch'],
-  live: ['status-rejected', '● Đang ghi (NVR)'],
-  blocked: ['status-inactive', 'Không ghi — phòng chưa duyệt'],
-};
+import { RECORDING_META as rec, SCHEDULE } from '../data/mock';
 
 export default function Schedule() {
   const { toast, log } = useApp();
