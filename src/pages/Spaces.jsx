@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Banner, DataBoundary, Icon, Chip, Empty, FieldError, Modal, PageHeader, ConfirmReason, SearchInput, Select, StatusDot } from '../components/ui';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Banner, DataBoundary, Icon, Chip, Empty, FieldError, Modal, PageHeader, ConfirmReason, SearchInput, Select, StatusDot, Tabs } from '../components/ui';
+import AccessGrants from './AccessGrants';
+import { ROOM_SURVEY } from '../data/attendance';
 import { useApp } from '../store';
 import { approveRoom, assignDevice, createRoom, setRoomZone, suggestRoomCode } from '../api/client';
 import { DEVICES } from '../data/mock';
@@ -19,6 +21,8 @@ export default function Spaces() {
   const [assign, setAssign] = useState('');
   const [approveAsk, setApproveAsk] = useState(false);
   const [zoneAsk, setZoneAsk] = useState(null);
+  const [params, setParams] = useSearchParams();
+  const tab = params.get('tab') || 'tree';
   const rooms = flatRooms(tree);
   const room = rooms.find((r) => r.id === sel);
   const free = DEVICES.filter((d) => !d.room || !rooms.some((r) => r.devices.includes(d.id)));
@@ -39,8 +43,11 @@ export default function Spaces() {
   return (
     <div>
       <PageHeader title="Không gian & khu vực" desc="Quản lý cây Tòa → Tầng → Phòng, loại khu vực và thiết bị gắn cố định với từng phòng."
-        actions={<button className="btn-primary" disabled={!can('space_write')} title={!can('space_write') ? 'Chỉ Quản trị hệ thống được thêm khu vực' : undefined} onClick={() => setAdding(true)}><Icon name="add" />Thêm khu vực</button>} />
+        actions={tab === 'tree' && <button className="btn-primary" disabled={!can('space_write')} title={!can('space_write') ? 'Chỉ Quản trị hệ thống được thêm khu vực' : undefined} onClick={() => setAdding(true)}><Icon name="add" />Thêm khu vực</button>} />
 
+      <Tabs label="Nội dung" className="mb-space-md border-b border-border-subtle" value={tab} onChange={(t) => setParams(t === 'tree' ? {} : { tab: t })}
+        items={[{ key: 'tree', label: 'Cây không gian' }, { key: 'grants', label: 'Quyền ra vào' }]} />
+      {tab === 'grants' ? <AccessGrants /> : (<>
       <DataBoundary name="spaces" label="cây không gian" scopeNote="global" skeleton="bar-split">
       <Banner tone="warn" title="Hạ tầng đi trước, thiết bị theo sau." className="mb-space-md">Phòng chưa được duyệt hạ tầng thì chưa được gán camera, thiết bị hay phát hành mã QR điểm danh.</Banner>
 
@@ -95,8 +102,24 @@ export default function Spaces() {
                 <label className="flex flex-col gap-1 text-label-md font-semibold">Loại khu vực
                   <Select className="font-normal" label="Loại khu vực" value={room.zone} options={ZONE_OPTIONS} onChange={(z) => setZoneAsk(z)} />
                 </label>
-                <p className="text-caption text-text-secondary pb-1">Khu vực Hạn chế và Cấm sẽ kích hoạt cảnh báo tức thời trong 2 giây.</p>
+                <p className="text-caption text-text-secondary pb-1">Hạn chế và Cấm: cảnh báo người lạ / không có quyền trong 2 giây. Công cộng và Vận hành: không cảnh báo khi người không có quyền xuất hiện.</p>
               </div>
+
+              {ROOM_SURVEY[room.id] && (() => {
+                const v = ROOM_SURVEY[room.id];
+                const okIed = v.ied != null && v.ied >= 40;
+                return (
+                  <div>
+                    <h3 className="section-title mb-2">Khảo sát cho nhận diện và điểm danh</h3>
+                    <dl className="grid grid-cols-3 gap-2 text-body-sm">
+                      <div className="p-2.5 rounded bg-surface-bright"><dt className="text-caption text-text-secondary">Mặt ở ghế xa nhất (khoảng cách 2 mắt)</dt><dd className={`font-semibold ${v.ied == null ? 'text-text-secondary' : okIed ? 'text-status-active' : 'text-status-rejected'}`}>{v.ied == null ? 'Chưa đo' : `${v.ied} px ${okIed ? '• đạt' : '• dưới mức 40 px'}`}</dd></div>
+                      <div className="p-2.5 rounded bg-surface-bright"><dt className="text-caption text-text-secondary">Camera cửa ra/vào</dt><dd className={`font-semibold ${v.doorCam ? 'text-status-active' : 'text-status-pending'}`}>{v.doorCam ? 'Có' : 'Chưa có'}</dd></div>
+                      <div className="p-2.5 rounded bg-surface-bright"><dt className="text-caption text-text-secondary">Sức chứa • ngày đo</dt><dd className="font-semibold">{v.seats ? `${v.seats} chỗ` : '—'} • {v.measured || 'chưa đo'}</dd></div>
+                    </dl>
+                    <p className="text-caption text-text-secondary mt-1.5">{!okIed ? 'Chưa đạt tiêu chí duyệt hạ tầng cho nhận diện trong lớp: cần ≥ 40 px ở ghế xa nhất (thêm camera hoặc ống tele cho nửa sau phòng). ' : ''}{!v.doorCam ? 'Không có camera cửa thì không kết luận chắc chắn "ra ngoài"; quy tắc Vắng giữa giờ chỉ ghi kết quả suy đoán.' : 'Có camera cửa: đo được thời gian rời lớp.'}{v.pilot ? ' Phòng đang chạy bóng R-007.' : ''}</p>
+                  </div>
+                );
+              })()}
 
               <div>
                 <h3 className="section-title mb-2">Thiết bị gắn cố định ({room.devices.length})</h3>
@@ -141,6 +164,7 @@ export default function Spaces() {
       </ConfirmReason>
       {adding && <AddRoom tree={tree} defaults={room} onClose={() => setAdding(false)}
         onDone={(r) => { setOpen((s) => new Set([...s, r.building_id, r.floor_id])); setSel(r.room.id); setQ(''); }} />}
+      </>)}
     </div>
   );
 }

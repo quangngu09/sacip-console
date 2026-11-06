@@ -9,6 +9,7 @@ import { fmtDateTime } from '../lib/format';
 import { fieldLabel, timeWindowText, valueText } from '../lib/policyText';
 import { unitName } from '../lib/scope';
 import EventRules from './EventRules';
+import AlertPolicies from './AlertPolicies';
 
 const current = (p) => p.versions.find((v) => v.version === p.current_version);
 
@@ -19,8 +20,8 @@ export default function Policies() {
     <div>
       <PageHeader title="Chính sách & quy tắc" desc="Mọi tham số vận hành lấy từ đây; không cấu hình trong mã nguồn hay tệp .env. Mỗi lần lưu tạo một phiên bản mới." />
       <Tabs label="Loại cấu hình" className="mb-space-md border-b border-border-subtle" value={tab} onChange={(t) => setParams(t === 'biometric' ? {} : { tab: t })}
-        items={[{ key: 'biometric', label: 'Chính sách sinh trắc' }, { key: 'rules', label: 'Quy tắc sự kiện' }]} />
-      {tab === 'biometric' ? <BiometricPolicies /> : <EventRules />}
+        items={[{ key: 'biometric', label: 'Chính sách sinh trắc' }, { key: 'rules', label: 'Quy tắc sự kiện' }, { key: 'alerts', label: 'Nhận cảnh báo' }]} />
+      {tab === 'biometric' ? <BiometricPolicies /> : tab === 'alerts' ? <AlertPolicies /> : <EventRules />}
     </div>
   );
 }

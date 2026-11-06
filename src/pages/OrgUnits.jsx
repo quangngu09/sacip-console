@@ -148,7 +148,7 @@ export default function OrgUnits() {
               </div>
 
               <div>
-                <h3 className="text-headline-md mb-2">Chính sách có phạm vi gồm đơn vị này</h3>
+                <h3 className="text-headline-md mb-2">Chính sách có phạm vi gồm đơn vị này (kể cả thừa kế từ đơn vị cha)</h3>
                 {usage.policies.length === 0 ? <p className="text-body-sm text-text-secondary">Không có. Đơn vị chưa nằm trong phạm vi chính sách nào nên hồ sơ thuộc đây sẽ không được thu thập Face ID.</p> : (
                   <ul className="flex flex-col divide-y divide-border-subtle border border-border-subtle rounded">
                     {usage.policies.map((id) => {

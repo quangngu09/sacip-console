@@ -26,6 +26,9 @@
   .data-table td { @apply px-3 py-2 border-b border-border-subtle; }
   .data-table tbody tr:last-child td { border-bottom: 0; }
   .skeleton { @apply rounded bg-surface-container; background-image: linear-gradient(90deg, transparent 30%, theme('colors.surface-container-low') 50%, transparent 70%); background-size: 200% 100%; background-attachment: fixed; animation: shimmer 1.4s linear infinite; }
+  /* Timeline có mặt: khoảng "không quan sát được" dùng sọc để không chỉ dựa vào màu. */
+  .stripe-unknown { background-image: repeating-linear-gradient(135deg, theme('colors.status-inactive') 0 3px, transparent 3px 7px); background-color: theme('colors.surface-container'); }
+  .stripe-break { background-image: repeating-linear-gradient(90deg, theme('colors.border-subtle') 0 1px, transparent 1px 4px); }
   .ms { overflow: hidden; width: 1em; height: 1em; flex-shrink: 0; font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; direction: ltr; -webkit-font-feature-settings: 'liga'; font-feature-settings: 'liga'; }
 }
 

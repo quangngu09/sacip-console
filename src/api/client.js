@@ -674,9 +674,13 @@ export function unitUsage(id) {
   const hit = findUnit(id);
   if (!hit) return { subjects: 0, policies: [] };
   const ids = unitIdsUnder(hit.node);
+  // Chính sách khoanh phạm vi ở đơn vị cha (kể cả "Toàn trường") cũng áp dụng cho đơn vị con.
+  const ancestors = [];
+  for (let up = hit.parent; up; up = findUnit(up.id)?.parent) ancestors.push(up.id);
+  const inScope = (u) => ids.includes(u) || ancestors.includes(u);
   return {
     subjects: db.subjects.filter((s) => ids.includes(s.org_unit)).length,
-    policies: db.policies.filter((p) => activeConfig(p).scope.org_units.some((u) => ids.includes(u))).map((p) => p.policy_id),
+    policies: db.policies.filter((p) => activeConfig(p).scope.org_units.some(inScope)).map((p) => p.policy_id),
   };
 }
 

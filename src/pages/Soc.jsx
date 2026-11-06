@@ -9,7 +9,7 @@ const LEVEL_RANK = { critical: 0, warning: 1, info: 2 };
 const STATE_RANK = { open: 0, ack: 1, closed: 2 };
 const STATE_LABEL = { ack: ['neutral', 'Đã tiếp nhận'], closed: ['status-active', 'Đã đóng'] };
 const byPriority = (a, b) => STATE_RANK[a.state] - STATE_RANK[b.state] || LEVEL_RANK[a.level] - LEVEL_RANK[b.level] || b.time.localeCompare(a.time);
-const ruleOf = (e) => (e.level === 'critical' ? (e.title.includes('danh sách cấm') ? 'R-003' : 'R-004') : e.title.includes('Dạy thay') ? 'R-005' : '—');
+const ruleOf = (e) => e.rule || (e.level === 'critical' ? (e.title.includes('danh sách cấm') ? 'R-003' : 'R-004B') : e.title.includes('Dạy thay') ? 'R-005' : '—');
 
 export default function Soc() {
   const { log, toast } = useApp();

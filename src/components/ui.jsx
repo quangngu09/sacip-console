@@ -507,8 +507,8 @@ const SKELETONS = {
  * skeleton: khung tải giống bố cục trang, là tên trong SKELETONS hoặc một phần tử React.
  * reveal: các khối con hiện lần lượt; tắt khi trang tự sắp hiệu ứng.
  */
-export function DataBoundary({ name, label, fill = false, scopeNote, skeleton = 'table', reveal = true, children }) {
-  const { status, reload } = useResource(name);
+export function DataBoundary({ name, label, load, fill = false, scopeNote, skeleton = 'table', reveal = true, children }) {
+  const { status, error, reload } = useResource(name, load);
   const { scope, primaryTenant, allUnits, allSubjects } = useScope();
   const box = `card ${fill ? 'flex-1 min-h-0' : ''}`;
   if (!primaryTenant) return <div className={box}><Empty icon="domain_disabled" title={`${scope.tenant} chưa có dữ liệu`} desc="Đơn vị này chưa được kết nối vào hệ thống. Đổi phạm vi ở thanh trên cùng để xem đơn vị khác." /></div>;
@@ -526,7 +526,7 @@ export function DataBoundary({ name, label, fill = false, scopeNote, skeleton = 
         <div className="py-12 flex flex-col items-center text-center">
           <Icon name="cloud_off" size={32} className="text-status-rejected mb-2" />
           <div className="text-label-md font-semibold">Không tải được {label}</div>
-          <p className="text-caption text-text-secondary mt-0.5 mb-3">Kiểm tra kết nối mạng rồi thử lại. Nếu vẫn lỗi, liên hệ bộ phận kỹ thuật.</p>
+          <p className="text-caption text-text-secondary mt-0.5 mb-3">{error || 'Kiểm tra kết nối mạng rồi thử lại. Nếu vẫn lỗi, liên hệ bộ phận kỹ thuật.'}</p>
           <button className="btn-primary" onClick={reload}><Icon name="refresh" />Thử lại</button>
         </div>
       </div>
