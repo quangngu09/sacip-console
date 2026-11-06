@@ -9,6 +9,8 @@ npm run dev        # http://localhost:5173
 ```
 Build: `npm run build` (thư mục `dist/`), hoặc `npm run build:single` để ra 1 file HTML duy nhất (`dist-single/index.html`).
 
+Trang Hồ sơ định danh đọc được dữ liệu thật khi chạy `npm run dev`: sao chép `.env.example` thành `.env.local` rồi điền token và API key. Khóa nằm ở proxy của máy chủ dev, không vào bundle; bản build chưa có proxy này nên cần một backend trung gian khi triển khai thật.
+
 ## Các màn hình
 | Route | Màn hình | Nguồn yêu cầu |
 |---|---|---|

@@ -24,11 +24,13 @@ export const useResourceLoading = () => useSyncExternalStore(subscribe, () => pe
 /**
  * Trạng thái tải của một nguồn dữ liệu. Nguồn đã tải trong phiên này thì hiển thị ngay và làm mới ngầm.
  * Khi phát triển, thêm ?demo=loading hoặc ?demo=error vào đường dẫn để xem thử.
+ * Truyền load (ổn định qua useCallback) để tải thật; lỗi của load hiện ra qua error.
  */
-export function useResource(name) {
+export function useResource(name, load) {
   const { search } = useLocation();
   const demo = import.meta.env.DEV ? new URLSearchParams(search).get('demo') : null;
   const [status, setStatus] = useState(() => (loaded.has(name) && !demo ? 'ready' : 'loading'));
+  const [error, setError] = useState(null);
   const [attempt, setAttempt] = useState(0);
 
   // Chạy trước khi vẽ để đổi nguồn (ví dụ đổi đơn vị) không lộ một khung hình dữ liệu cũ.
@@ -39,12 +41,12 @@ export function useResource(name) {
     setStatus(cached ? 'ready' : 'loading');
     addPending(1);
     // "Thử lại" luôn thành công ở chế độ xem thử để thấy được cả đường phục hồi.
-    loadResource(name, attempt > 0 ? null : demo, cached)
+    (load && !demo ? load() : loadResource(name, attempt > 0 ? null : demo, cached))
       .then(() => { if (live) { loaded.add(name); setStatus('ready'); finish(); } })
-      .catch(() => { if (live) { setStatus('error'); finish(); } });
+      .catch((e) => { if (live) { setError(load ? e.message : null); setStatus('error'); finish(); } });
     return finish;
-  }, [name, demo, attempt]);
+  }, [name, demo, attempt, load]);
 
   const reload = useCallback(() => setAttempt((a) => a + 1), []);
-  return { status, reload };
+  return { status, error, reload };
 }

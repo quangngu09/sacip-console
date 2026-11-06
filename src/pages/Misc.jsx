@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Banner, Chip, ConfirmReason, DataBoundary, Empty, Icon, MetricStrip, PageHeader, SearchInput, Select, StateBadge, SubjectTypeChip } from '../components/ui';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Banner, Chip, ConfirmReason, DataBoundary, Empty, Icon, MetricStrip, PageHeader, SearchInput, Select, StateBadge, SubjectTypeChip, Tabs } from '../components/ui';
+import { PurposesTab, RetentionTab } from './ConsentPurposes';
 import { useApp } from '../store';
 import { advanceErasure, exportAudit, requestReconsent, verifyAuditChain } from '../api/client';
 import { ACTION, ROLES, consentLabel } from '../api/enums';
@@ -160,10 +161,15 @@ export function Consents() {
     ['Đã rút đồng ý', cs.withdrawn, 'bg-status-rejected'],
   ];
   const people = data.subjects.filter((s) => s.states.consent !== 'ACTIVE' || s.consent_version !== 'v1.2');
+  const [params, setParams] = useSearchParams();
+  const tab = params.get('tab') || 'status';
 
   return (
     <div>
       <PageHeader title="Đồng ý & bảo mật" desc="Không có sự đồng ý hợp lệ thì không xử lý sinh trắc. Theo dõi phiên bản điều khoản, tỷ lệ đồng ý và việc xóa dữ liệu khi có người rút đồng ý." />
+      <Tabs label="Nội dung" className="mb-space-md border-b border-border-subtle" value={tab} onChange={(t) => setParams(t === 'status' ? {} : { tab: t })}
+        items={[{ key: 'status', label: 'Trạng thái đồng ý' }, { key: 'purposes', label: 'Mục đích xử lý' }, { key: 'retention', label: 'Lưu trữ & DPIA' }]} />
+      {tab === 'purposes' ? <PurposesTab /> : tab === 'retention' ? <RetentionTab /> : (
       <DataBoundary name="consents" label="dữ liệu đồng ý" scopeNote="global" skeleton="metrics-table">
         <MetricStrip className="mb-space-md" items={[
           { label: 'Tỷ lệ đồng ý toàn trường', value: fmtPercent(((cs.active_current + cs.active_old) / cs.total) * 100), sub: `${fmtNumber(cs.active_current + cs.active_old)} / ${fmtNumber(cs.total)} người` },
@@ -249,6 +255,7 @@ export function Consents() {
           </section>
         </div>
       </DataBoundary>
+      )}
 
       <ConfirmReason open={!!ask} onClose={() => setAsk(null)} title={ask === 'OLD_VERSION' ? 'Mời xác nhận điều khoản v1.2' : 'Nhắc người chưa xác nhận'}
         subtitle={`${fmtNumber(ask === 'OLD_VERSION' ? cs.active_old : cs.pending)} người sẽ nhận thông báo trên App MyDaiNam`} confirmLabel="Gửi"
