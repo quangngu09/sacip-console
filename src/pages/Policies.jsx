@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Banner, Chip, ConfirmReason, DataBoundary, Icon, PageHeader, SourceBadge, SubjectTypeChip, Tabs } from '../components/ui';
 import { useApp } from '../store';
@@ -10,6 +10,7 @@ import { fieldLabel, timeWindowText, valueText } from '../lib/policyText';
 import { unitName } from '../lib/scope';
 import EventRules from './EventRules';
 import AlertPolicies from './AlertPolicies';
+import { attachRule, detachRule, excludeRule, excludedFor, includeRule, rulesForPolicy, useRules } from '../data/rulesStore';
 
 const current = (p) => p.versions.find((v) => v.version === p.current_version);
 
@@ -28,7 +29,11 @@ export default function Policies() {
 
 function BiometricPolicies() {
   const { data, can } = useApp();
-  const [sel, setSel] = useState(data.policies[0].policy_id);
+  const [params] = useSearchParams();
+  const wanted = params.get('policy');
+  const [rules] = useRules();
+  const [sel, setSel] = useState(() => (data.policies.some((p) => p.policy_id === wanted) ? wanted : data.policies[0].policy_id));
+  useEffect(() => { if (data.policies.some((p) => p.policy_id === wanted)) setSel(wanted); }, [wanted]); // eslint-disable-line react-hooks/exhaustive-deps
   const policy = data.policies.find((p) => p.policy_id === sel);
   return (
     <DataBoundary name="policies" label="danh sách chính sách" skeleton="split">
@@ -49,12 +54,13 @@ function BiometricPolicies() {
                   <SubjectTypeChip type={p.target_subject_type} />
                   <span className="text-caption text-text-secondary">{c.biometric.pose_count} tư thế</span>
                   <span className="text-caption text-text-secondary">• {c.biometric.ai_auto_approve_enabled ? `AI tự duyệt từ ${c.biometric.ai_auto_approve_threshold}%` : 'Duyệt tay'}</span>
+                  <span className="text-caption text-text-secondary">• {rulesForPolicy(rules, p.policy_id).length} quy tắc</span>
                 </div>
               </button>
             );
           })}
         </nav>
-        <PolicyDetail policy={policy} />
+        <PolicyDetail policy={policy} rules={rules} />
       </div>
     </DataBoundary>
   );
@@ -66,7 +72,7 @@ const Row = ({ label, children }) => (
   </div>
 );
 
-function PolicyDetail({ policy }) {
+function PolicyDetail({ policy, rules }) {
   const { can, call, toast } = useApp();
   const [rollback, setRollback] = useState(null);
   const [openVer, setOpenVer] = useState(null);
@@ -126,6 +132,8 @@ function PolicyDetail({ policy }) {
         </div>
       </div>
 
+      <PolicyRules key={policy.policy_id} policy={policy} all={rules} zones={c.spatial.zones} />
+
       <div className="border-t border-border-subtle">
         <h3 className="section-title px-space-md pt-3 pb-2">Lịch sử phiên bản</h3>
         <ol className="divide-y divide-border-subtle">
@@ -168,5 +176,100 @@ function PolicyDetail({ policy }) {
         <Banner>Khôi phục không ghi đè lịch sử: hệ thống tạo phiên bản mới mang cấu hình của {rollback}.</Banner>
       </ConfirmReason>
     </section>
+  );
+}
+
+const MODE_CHIP = { active: ['status-active', 'Đang chạy'], shadow: ['secondary', 'Chạy bóng'], off: ['status-inactive', 'Tắt'] };
+
+/** Quy tắc sự kiện áp dụng cho nhóm đối tượng của chính sách này: gắn, gỡ, loại trừ ngay tại đây. */
+function PolicyRules({ policy, all, zones }) {
+  const { can, log, toast } = useApp();
+  const id = policy.policy_id;
+  const write = can('policy_write');
+  const [ask, setAsk] = useState(null); // { kind: 'attach' | 'detach' | 'exclude' | 'include', rule }
+  const [picked, setPicked] = useState([]);
+  const applied = rulesForPolicy(all, id);
+  const own = applied.filter((r) => Array.isArray(r.policies));
+  const shared = applied.filter((r) => r.policies === 'ALL');
+  const excluded = excludedFor(all, id);
+  const candidates = all.filter((r) => Array.isArray(r.policies) && !r.policies.includes(id));
+  const anonymous = all.filter((r) => r.policies === 'NONE');
+  const noWrite = write ? undefined : 'Chỉ Quản trị hệ thống được thay đổi';
+
+  const done = (msg, detail) => { log(`${msg} — ${detail}`, id); toast(msg, `${policy.name} (${id})`, 'success'); setAsk(null); setPicked([]); };
+  const confirm = (reason) => {
+    const r = ask.rule;
+    if (ask.kind === 'attach') {
+      if (!picked.length) { toast('Chưa chọn quy tắc', 'Chọn ít nhất một quy tắc để gắn.', 'error'); return; }
+      picked.forEach((x) => attachRule(x, id));
+      done(`Đã gắn ${picked.length} quy tắc`, `Gắn ${picked.join(', ')} vào ${id}: ${reason}`);
+    } else if (ask.kind === 'detach') { detachRule(r.id, id); done(`Đã gỡ ${r.id}`, `Gỡ ${r.id} khỏi ${id}: ${reason}`); }
+    else if (ask.kind === 'exclude') { excludeRule(r.id, id); done(`Đã loại trừ ${r.id}`, `Loại trừ ${id} khỏi ${r.id}: ${reason}`); }
+    else { includeRule(r.id, id); done(`Đã áp dụng lại ${r.id}`, `Bỏ loại trừ ${id} khỏi ${r.id}: ${reason}`); }
+  };
+
+  const row = (r, action) => (
+    <li key={r.id} className="px-space-md py-2.5 flex items-start gap-3">
+      <span className="font-mono text-caption text-text-secondary w-14 shrink-0 pt-0.5">{r.id}</span>
+      <div className="flex-1 min-w-0">
+        <div className="text-body-sm font-medium flex items-center gap-1.5">{r.type === 'realtime' && <Icon name="bolt" size={16} className="text-status-rejected" />}{r.name}</div>
+        <div className="text-caption text-text-secondary">{r.space} • {r.time} → {r.action}</div>
+      </div>
+      <Chip color={MODE_CHIP[r.mode][0]}>{MODE_CHIP[r.mode][1]}</Chip>
+      {action}
+    </li>
+  );
+  const btn = (label, icon, kind, r) => <button className="btn-outline btn-sm shrink-0" disabled={!write} title={noWrite} onClick={() => setAsk({ kind, rule: r })}><Icon name={icon} size={16} />{label}</button>;
+  const title = ask && { attach: 'Gắn quy tắc vào chính sách', detach: `Gỡ ${ask.rule?.id} khỏi chính sách`, exclude: `Loại trừ chính sách khỏi ${ask.rule?.id}`, include: `Áp dụng lại ${ask.rule?.id}` }[ask.kind];
+
+  return (
+    <div className="border-t border-border-subtle">
+      <div className="px-space-md pt-3 pb-1 flex flex-col gap-2">
+        <div>
+          <h3 className="section-title">Quy tắc sự kiện áp dụng ({applied.length})</h3>
+          <p className="text-caption text-text-secondary">Chính sách quyết định ai có Face ID và mẫu khuôn mặt được nạp xuống khu vực nào (<span className="font-mono">{zones.join(', ')}</span>). Quy tắc quyết định hệ thống làm gì khi nhận diện được họ ở đó.</p>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <button className="btn-outline btn-sm" disabled={!write || !candidates.length} title={noWrite || (!candidates.length ? 'Mọi quy tắc riêng đã được gắn' : undefined)} onClick={() => { setPicked([]); setAsk({ kind: 'attach' }); }}><Icon name="add_link" size={16} />Gắn quy tắc có sẵn</button>
+          {write
+            ? <Link to={`/chinh-sach?tab=rules&policy=${id}&new=1`} className="btn-outline btn-sm"><Icon name="add" size={16} />Tạo quy tắc mới</Link>
+            : <button className="btn-outline btn-sm" disabled title={noWrite}><Icon name="add" size={16} />Tạo quy tắc mới</button>}
+          <Link to={`/chinh-sach?tab=rules&policy=${id}`} className="btn-outline btn-sm"><Icon name="rule" size={16} />Xem trong Quy tắc sự kiện</Link>
+        </div>
+      </div>
+      {!write && <p className="px-space-md text-caption text-text-secondary flex items-center gap-1"><Icon name="lock" size={14} />Chỉ xem. Đổi sang vai trò Quản trị hệ thống để gắn, gỡ hoặc loại trừ quy tắc.</p>}
+
+      {applied.length === 0 && <p className="px-space-md py-2 text-body-sm text-text-secondary">Chưa có quy tắc nào. Người thuộc chính sách này chỉ được nhận diện để mở cửa, không có điểm danh hay cảnh báo.</p>}
+      {own.length > 0 && <><p className="px-space-md pt-1 text-caption font-semibold text-text-secondary">Riêng cho chính sách này</p><ul className="divide-y divide-border-subtle">{own.map((r) => row(r, btn('Gỡ', 'link_off', 'detach', r)))}</ul></>}
+      {shared.length > 0 && <><p className="px-space-md pt-2 text-caption font-semibold text-text-secondary">Áp dụng cho mọi chính sách</p><ul className="divide-y divide-border-subtle">{shared.map((r) => row(r, btn('Loại trừ', 'block', 'exclude', r)))}</ul></>}
+      {excluded.length > 0 && <><p className="px-space-md pt-2 text-caption font-semibold text-text-secondary">Đã loại trừ khỏi chính sách này</p><ul className="divide-y divide-border-subtle opacity-75">{excluded.map((r) => row(r, btn('Áp dụng lại', 'undo', 'include', r)))}</ul></>}
+      <div className="h-2" />
+
+      <ConfirmReason open={!!ask} onClose={() => setAsk(null)} danger={ask?.kind === 'detach' || ask?.kind === 'exclude'} title={title} subtitle={`${policy.name} (${id})`}
+        confirmLabel={ask?.kind === 'attach' ? `Gắn ${picked.length || ''} quy tắc` : ask?.kind === 'detach' ? 'Gỡ' : ask?.kind === 'exclude' ? 'Loại trừ' : 'Áp dụng lại'} onConfirm={confirm}>
+        {ask?.kind === 'attach' && (
+          <div className="flex flex-col gap-1.5 max-h-[320px] overflow-y-auto">
+            {candidates.map((r) => {
+              const on = picked.includes(r.id);
+              return (
+                <button key={r.id} type="button" aria-pressed={on} onClick={() => setPicked((p) => (on ? p.filter((x) => x !== r.id) : [...p, r.id]))}
+                  className={`text-left p-2.5 rounded border flex items-start gap-2 ${on ? 'border-primary-container bg-primary-fixed' : 'border-border-subtle hover:bg-surface-container-low'}`}>
+                  <Icon name={on ? 'check_box' : 'check_box_outline_blank'} size={18} className={on ? 'text-primary-container' : 'text-text-secondary'} />
+                  <span className="flex-1 min-w-0">
+                    <span className="text-body-sm font-medium"><span className="font-mono text-caption text-text-secondary mr-1.5">{r.id}</span>{r.name}</span>
+                    <span className="block text-caption text-text-secondary">{r.space} • {r.time}{r.policies.length ? ` • đang áp dụng cho ${r.policies.join(', ')}` : ' • chưa gắn chính sách nào'}</span>
+                  </span>
+                  <Chip color={MODE_CHIP[r.mode][0]}>{MODE_CHIP[r.mode][1]}</Chip>
+                </button>
+              );
+            })}
+            {anonymous.length > 0 && <p className="text-caption text-text-secondary mt-1">Không gắn được: {anonymous.map((r) => r.id).join(', ')} vì không dựa trên hồ sơ Face ID (người lạ, đếm ẩn danh, khuôn mặt không khớp).</p>}
+          </div>
+        )}
+        {ask?.kind === 'detach' && ask.rule.policies.length === 1 && <Banner tone="warn">{ask.rule.id} chỉ đang áp dụng cho chính sách này. Sau khi gỡ, quy tắc không còn áp dụng cho ai và tự chuyển sang Tắt.</Banner>}
+        {(ask?.kind === 'detach' || ask?.kind === 'exclude') && ask.rule.type === 'realtime' && <Banner tone="danger">Đây là cảnh báo an ninh thời gian thực. Người thuộc {policy.name} sẽ không còn kích hoạt còi và báo an ninh theo quy tắc này.</Banner>}
+        {ask?.kind === 'include' && <Banner>Người thuộc {policy.name} sẽ lại chịu quy tắc {ask.rule.id} như mọi chính sách khác.</Banner>}
+      </ConfirmReason>
+    </div>
   );
 }

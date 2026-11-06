@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Banner, Chip, ChipToggleGroup, DataBoundary, Drawer, Icon, Select, Tabs } from '../components/ui';
 import { useApp } from '../store';
-import { RULES } from '../data/mock';
+import { useRules } from '../data/rulesStore';
 import { ALERT_KIND, ALERT_POLICIES, SEVERITY } from '../data/attendance';
 
 const CHANNELS = ['Console An ninh', 'App bảo vệ (push)', 'Còi tại chỗ', 'Console', 'App MyDaiNam', 'Email tổng hợp', 'Email tổng hợp tuần', 'Email', 'Báo cáo tuần'];
-const RECIPIENTS = ['Trực an ninh phụ trách zone', 'Đơn vị quản lý zone', 'Trưởng ca an ninh', 'Cố vấn học tập của lớp hành chính', 'Phòng Công tác sinh viên', 'Giảng viên (giải trình trước)', 'Trưởng khoa sau 48 giờ', 'Bộ phận Thiết bị', 'Quản trị hệ thống'];
+const RECIPIENTS = ['Trực an ninh phụ trách zone', 'Đơn vị quản lý zone', 'Trưởng ca an ninh', 'Cố vấn học tập của lớp hành chính', 'Phòng Công tác sinh viên', 'Giảng viên (giải trình trước)', 'Trưởng khoa sau 48 giờ', 'Bộ phận Thiết bị', 'Quản trị hệ thống', 'Ban Quản lý KTX'];
 const SECURITY_ONLY = ['Còi tại chỗ', 'App bảo vệ (push)', 'Console An ninh', 'Trực an ninh phụ trách zone', 'Trưởng ca an ninh'];
 
 /** Chính sách cảnh báo: mức độ × người nhận × kênh × chống trùng × leo thang. Quy tắc chỉ tham chiếu tới đây. */
@@ -15,7 +15,8 @@ export default function AlertPolicies() {
   const [kind, setKind] = useState('all');
   const [edit, setEdit] = useState(null);
   const rows = items.filter((a) => kind === 'all' || a.kind === kind);
-  const usedBy = (id) => RULES.filter((r) => r.alert === id).map((r) => r.id);
+  const [rules] = useRules();
+  const usedBy = (id) => rules.filter((r) => r.alert === id).map((r) => r.id);
 
   return (
     <div>

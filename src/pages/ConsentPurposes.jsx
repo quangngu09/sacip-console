@@ -1,10 +1,11 @@
 import { Banner, Chip, Icon } from '../components/ui';
-import { RULES } from '../data/mock';
+import { useRules } from '../data/rulesStore';
 import { DPIA, OPT_OUT_RULES, PURPOSES, RETENTION } from '../data/attendance';
 import { fmtNumber, fmtPercent } from '../lib/format';
 
 /** Mục đích xử lý: đồng ý riêng cho từng mục đích (Luật 91/2025, Đ.9). Quy tắc chỉ bật được khi mục đích đã có đồng ý. */
 export function PurposesTab() {
+  const [RULES] = useRules();
   const drafts = PURPOSES.filter((p) => p.status === 'draft').length;
   return (
     <div className="flex flex-col gap-space-md">

@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Banner, ConfirmReason, DataBoundary, Icon, Chip, Empty, Modal, Select, SortTh, Tabs, useSort } from '../components/ui';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Banner, ChipToggleGroup, ConfirmReason, DataBoundary, Icon, Chip, Empty, Modal, Select, SortTh, Tabs, useSort } from '../components/ui';
 import { useApp } from '../store';
-import { RULES } from '../data/mock';
+import { appliesTo, useRules } from '../data/rulesStore';
 import { ALERT_KIND, ALERT_POLICIES, PURPOSES, alertPolicyOf, purposeOf, purposeReady } from '../data/attendance';
 import { fmtNumber } from '../lib/format';
 
@@ -22,28 +22,28 @@ const TYPE_HINT = {
 /** Thư viện mẫu. sentence: chuỗi chữ và tên ô cần điền. */
 const TEMPLATES = [
   {
-    key: 'stranger', group: 'Không khớp hồ sơ nào', icon: 'person_alert', name: 'Người lạ vào khu vực hạn chế', type: 'realtime', purpose: 'P-SECURITY', alert: 'AP-SEC-WARN',
+    key: 'stranger', policies: 'NONE', group: 'Không khớp hồ sơ nào', icon: 'person_alert', name: 'Người lạ vào khu vực hạn chế', type: 'realtime', purpose: 'P-SECURITY', alert: 'AP-SEC-WARN',
     desc: 'Không khớp hồ sơ nào sau một khoảng theo dõi đủ dài. Gồm cả người chưa thu thập hoặc chưa đồng ý, nên cần bảo vệ xác nhận.',
     fields: { zone: ['Khu Hạn chế và Cấm', 'Chỉ khu Cấm', 'Phòng Server A501', 'Phòng thí nghiệm C202'], secs: ['3', '5', '10'], frames: ['3', '5'], act: ['báo bảo vệ zone kèm ảnh để xác nhận', 'phát còi ngay và báo bảo vệ'] },
     defaults: { zone: 'Khu Hạn chế và Cấm', secs: '3', frames: '3', act: 'báo bảo vệ zone kèm ảnh để xác nhận' },
     sentence: ['Khi một người', 'không khớp hồ sơ nào', 'xuất hiện tại', 'zone', 'liên tục ít nhất', 'secs', 'giây và', 'frames', 'khung hình đủ chất lượng, thì', 'act', '.'],
   },
   {
-    key: 'noaccess', group: 'Có hồ sơ, không có quyền ra vào', icon: 'no_accounts', name: 'Có hồ sơ nhưng không có quyền vào', type: 'realtime', purpose: 'P-ACCESS', alert: 'AP-SEC-CRIT',
+    key: 'noaccess', policies: 'ALL', group: 'Có hồ sơ, không có quyền ra vào', icon: 'no_accounts', name: 'Có hồ sơ nhưng không có quyền vào', type: 'realtime', purpose: 'P-ACCESS', alert: 'AP-SEC-CRIT',
     desc: 'Chỉ phát khi nhận diện chắc chắn. Trước khi báo, kiểm tra quyền đang chờ duyệt để tránh báo nhầm do Nhân sự đồng bộ trễ.',
     fields: { zone: ['Khu Hạn chế và Cấm', 'Phòng Server A501', 'Phòng thí nghiệm C202'], frames: ['2', '3'], act: ['phát còi tại chỗ và báo bảo vệ + đơn vị quản lý zone', 'chỉ báo bảo vệ + đơn vị quản lý zone'] },
     defaults: { zone: 'Khu Hạn chế và Cấm', frames: '2', act: 'phát còi tại chỗ và báo bảo vệ + đơn vị quản lý zone' },
     sentence: ['Khi một người', 'được nhận diện chắc chắn', 'trong', 'frames', 'khung hình tại', 'zone', 'mà không có quyền ra vào hiệu lực, thì', 'act', '.'],
   },
   {
-    key: 'midabsent', group: 'Sinh viên của lớp học phần', icon: 'directions_walk', name: 'Sinh viên rời lớp quá lâu', type: 'audit', purpose: 'P-ATT-CONT', alert: 'AP-ACAD-REPEAT',
+    key: 'midabsent', policies: ['POL-STU'], group: 'Sinh viên của lớp học phần', icon: 'directions_walk', name: 'Sinh viên rời lớp quá lâu', type: 'audit', purpose: 'P-ATT-CONT', alert: 'AP-ACAD-REPEAT',
     desc: 'Kết luận cuối tiết, không cảnh báo tức thời. Đi vệ sinh, nghe điện thoại dưới ngưỡng thì bỏ qua. Cần camera cửa để kết luận chắc chắn.',
     fields: { who: ['sinh viên của lớp học phần'], share: ['1/3 tiết', '1/2 tiết'], when: ['giờ tiết học, trừ giải lao và khoảng có phép'], act: ['ghi "Vắng giữa giờ" khi chốt tiết', 'chỉ ghi vào báo cáo'] },
     defaults: { who: 'sinh viên của lớp học phần', share: '1/3 tiết', when: 'giờ tiết học, trừ giải lao và khoảng có phép', act: 'ghi "Vắng giữa giờ" khi chốt tiết' },
     sentence: ['Khi', 'who', 'rời phòng của tiết với tổng thời gian vượt', 'share', 'trong', 'when', ', thì', 'act', '.'],
   },
   {
-    key: 'teacher', group: 'Giảng viên phụ trách tiết', icon: 'co_present', name: 'Giảng viên chưa vào lớp', type: 'audit', purpose: 'P-LECTURER', alert: 'AP-TEACH',
+    key: 'teacher', policies: ['POL-STF'], group: 'Giảng viên phụ trách tiết', icon: 'co_present', name: 'Giảng viên chưa vào lớp', type: 'audit', purpose: 'P-LECTURER', alert: 'AP-TEACH',
     desc: 'Chỉ tạo danh sách ngoại lệ để GV giải trình trước, rồi mới tới Trưởng khoa. Không cảnh báo thời gian thực, không tự thành vi phạm.',
     fields: { mins: ['15', '20', '30'], act: ['đưa vào danh sách ngoại lệ chờ GV giải trình'] },
     defaults: { mins: '15', act: 'đưa vào danh sách ngoại lệ chờ GV giải trình' },
@@ -54,12 +54,19 @@ const FIELD_LABEL = { zone: 'Khu vực', secs: 'Số giây', frames: 'Số khung
 
 /** Quy tắc sự kiện. Hiển thị như một tab của trang Chính sách & quy tắc. */
 export default function EventRules() {
-  const { log, toast, can } = useApp();
-  const [rules, setRules] = useState(RULES);
+  const { data, log, toast, can } = useApp();
+  const [rules, setRules] = useRules();
+  const [params, setParams] = useSearchParams();
+  const pol = params.get('policy') || 'all';
+  const setPol = (v) => setParams(v === 'all' ? { tab: 'rules' } : { tab: 'rules', policy: v });
   const [type, setType] = useState('all');
-  const [editor, setEditor] = useState(false);
+  const [editor, setEditor] = useState(() => params.get('new') === '1' && can('policy_write'));
   const [modeAsk, setModeAsk] = useState(null);
-  const rows = rules.filter((r) => type === 'all' || (type === 'shadow' ? r.mode === 'shadow' : r.type === type));
+  const rows = rules
+    .filter((r) => type === 'all' || (type === 'shadow' ? r.mode === 'shadow' : r.type === type))
+    .filter((r) => pol === 'all' || (pol === 'NONE' ? r.policies === 'NONE' : appliesTo(r, pol)));
+  const policyName = (id) => data.policies.find((p) => p.policy_id === id)?.name || id;
+  const policyOptions = [{ value: 'all', label: 'Mọi chính sách sinh trắc' }, ...data.policies.map((p) => ({ value: p.policy_id, label: `${p.name} (${p.policy_id})` })), { value: 'NONE', label: 'Không định danh (không dựa trên Face ID)' }];
   const table = useSort(rows, SORTERS);
   const pendingCount = rules.filter((r) => r.pending).length;
 
@@ -90,7 +97,10 @@ export default function EventRules() {
           { key: 'audit', label: 'Ghi nhận học vụ / vận hành', count: rules.filter((r) => r.type === 'audit').length },
           { key: 'shadow', label: 'Đang chạy bóng', count: rules.filter((r) => r.mode === 'shadow').length },
         ]} />
-        <p className="px-space-md py-2 text-caption text-text-secondary border-b border-border-subtle">{TYPE_HINT[type]}</p>
+        <div className="px-space-md py-2 border-b border-border-subtle flex items-center gap-3">
+          <p className="text-caption text-text-secondary flex-1">{TYPE_HINT[type]}</p>
+          <Select className="!w-[300px]" label="Lọc theo chính sách sinh trắc" value={pol} options={policyOptions} onChange={setPol} />
+        </div>
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead><tr><SortTh k="name" table={table}>Quy tắc</SortTh><SortTh k="group" table={table}>Áp dụng cho</SortTh><th>Hành động</th><SortTh k="purpose" table={table}>Mục đích xử lý • nhận cảnh báo</SortTh><SortTh k="mode" table={table}>Chế độ</SortTh><SortTh k="hits" table={table}>Khớp 30 ngày</SortTh><th>Thao tác</th></tr></thead>
@@ -100,14 +110,21 @@ export default function EventRules() {
                 const ap = alertPolicyOf(r.alert);
                 return (
                   <tr key={r.id} className="hover:bg-surface-container-low align-top">
-                    <td className="min-w-[220px] py-3">
+                    <td className="min-w-[190px] py-3">
                       <div className="flex items-center gap-1.5 font-medium">{r.type === 'realtime' && <Icon name="bolt" size={16} className="text-status-rejected" />}{r.name}</div>
                       <div className="text-caption font-mono text-text-secondary">{r.id}</div>
                       {r.needs && <div className="mt-1 text-caption text-status-pending flex items-start gap-1"><Icon name="info" size={14} className="mt-0.5" />{r.needs}</div>}
                     </td>
-                    <td className="min-w-[170px] py-3"><div>{r.group}</div><div className="text-caption text-text-secondary">{r.space} • {r.time}</div></td>
-                    <td className="min-w-[200px] py-3">{r.action}{r.params && <div><Link to="/thoi-khoa-bieu?view=params" className="text-caption text-primary-container hover:underline">Theo Tham số điểm danh</Link></div>}</td>
-                    <td className="min-w-[220px] py-3">
+                    <td className="min-w-[190px] py-3">
+                      <div className="flex flex-wrap gap-1 mb-1">
+                        {r.policies === 'ALL' && <Chip color="primary" icon="select_all">Mọi chính sách</Chip>}
+                        {r.policies === 'NONE' && <Chip color="status-inactive" icon="face_retouching_off">Không định danh</Chip>}
+                        {Array.isArray(r.policies) && r.policies.map((id) => <Link key={id} to={`/chinh-sach?policy=${id}`} title="Mở chính sách sinh trắc"><Chip color="primary" icon="policy">{policyName(id)}</Chip></Link>)}
+                      </div>
+                      <div>{r.group}</div><div className="text-caption text-text-secondary">{r.space} • {r.time}</div>
+                    </td>
+                    <td className="min-w-[180px] py-3">{r.action}{r.params && <div><Link to="/thoi-khoa-bieu?view=params" className="text-caption text-primary-container hover:underline">Theo Tham số điểm danh</Link></div>}</td>
+                    <td className="min-w-[190px] py-3">
                       <div className="text-body-sm">{p?.name}</div>
                       {p && (p.status === 'active' ? <Chip color="status-active" icon="verified">{p.terms === 'Không cần' ? 'Không cần đồng ý' : `Có đồng ý ${p.terms}`}</Chip> : <Chip color="status-pending" icon="pending">Chờ {p.terms}</Chip>)}
                       <div className="mt-1.5 text-caption">{ap ? <Link to="/chinh-sach?tab=alerts" className="hover:underline text-text-secondary"><span className="flex items-start gap-1"><Icon name={ALERT_KIND[ap.kind][0]} size={14} className="mt-0.5" />{ap.name}</span></Link> : <span className="text-text-secondary">Không gửi cảnh báo</span>}</div>
@@ -129,7 +146,7 @@ export default function EventRules() {
       </div>
       </DataBoundary>
 
-      <RuleEditor open={editor} onClose={() => setEditor(false)} nextId={`R-${String(rules.length + 1).padStart(3, '0')}`}
+      <RuleEditor open={editor} onClose={() => { setEditor(false); if (params.get('new')) setPol(pol); }} policies={data.policies} preset={pol !== 'all' && pol !== 'NONE' ? pol : null} nextId={`R-${String(rules.length + 1).padStart(3, '0')}`}
         onSave={(r) => { setRules((rs) => [...rs, r]); log(`${r.pending ? 'Gửi duyệt bật' : 'Lưu chạy bóng'} quy tắc ${r.id}: ${r.name}`, r.id); toast(r.pending ? 'Đã gửi duyệt bật' : 'Đã lưu ở chế độ chạy bóng', `${r.id} • ${r.name}`, 'success'); setEditor(false); }} />
 
       <ConfirmReason open={!!modeAsk} onClose={() => setModeAsk(null)} danger={modeAsk?.rule.mode === 'active' && modeAsk?.mode !== 'active'} title={`Đổi chế độ quy tắc ${modeAsk?.rule.id}`} subtitle={modeAsk?.rule.name}
@@ -165,18 +182,20 @@ export default function EventRules() {
   );
 }
 
-function RuleEditor({ open, onClose, onSave, nextId }) {
+function RuleEditor({ open, onClose, onSave, nextId, policies, preset }) {
   const [tpl, setTpl] = useState(null);
+  const [scope, setScope] = useState([]);
   const [vals, setVals] = useState({});
   const [purpose, setPurpose] = useState('');
   const [alert, setAlert] = useState('');
   const [dry, setDry] = useState(null);
   const close = () => { setTpl(null); setDry(null); onClose(); };
-  const pick = (t) => { setTpl(t); setVals(t.defaults); setPurpose(t.purpose); setAlert(t.alert); setDry(null); };
+  const pick = (t) => { setTpl(t); setScope(Array.isArray(t.policies) ? (preset ? [preset] : t.policies) : []); setVals(t.defaults); setPurpose(t.purpose); setAlert(t.alert); setDry(null); };
   const set = (k, v) => { setVals((s) => ({ ...s, [k]: v })); setDry(null); };
 
   const ap = alertPolicyOf(alert);
   const checks = tpl ? [
+    { ok: !Array.isArray(tpl.policies) || scope.length > 0, label: Array.isArray(tpl.policies) ? (scope.length ? `Áp dụng cho ${scope.length} chính sách sinh trắc` : 'Chưa chọn chính sách sinh trắc') : tpl.policies === 'ALL' ? 'Áp dụng cho mọi người đã có Face ID' : 'Không dựa trên hồ sơ Face ID' },
     { ok: !!purpose, label: 'Đã chọn mục đích xử lý' },
     { ok: purposeReady(purpose), warn: true, label: purposeReady(purpose) ? 'Mục đích đã có đồng ý hợp lệ' : 'Mục đích chưa có đồng ý: chỉ được lưu chạy bóng' },
     { ok: !(tpl.type === 'audit' && ap?.kind === 'security'), label: tpl.type === 'audit' && ap?.kind === 'security' ? 'Sự kiện học vụ không được gửi bảo vệ' : 'Người nhận phù hợp với loại sự kiện' },
@@ -192,7 +211,7 @@ function RuleEditor({ open, onClose, onSave, nextId }) {
 
   const save = (live) => onSave({
     id: nextId, name: tpl.name, group: tpl.group, space: vals.zone || 'Phòng của tiết học', time: tpl.type === 'realtime' ? '24/7' : 'Theo lịch học',
-    action: vals.act, type: tpl.type, purpose, alert, mode: 'shadow', pending: live, hits: 0,
+    action: vals.act, type: tpl.type, policies: Array.isArray(tpl.policies) ? scope : tpl.policies, purpose, alert, mode: 'shadow', pending: live, hits: 0,
   });
 
   return (
@@ -220,6 +239,13 @@ function RuleEditor({ open, onClose, onSave, nextId }) {
               : <span key={i}>{part} </span>))}
           </section>
 
+          <div className="flex flex-col gap-1.5">
+            <span className="text-label-md font-semibold">Áp dụng cho chính sách sinh trắc</span>
+            {Array.isArray(tpl.policies)
+              ? <ChipToggleGroup label="Chính sách sinh trắc" value={scope} onChange={(v) => { setScope(v); setDry(null); }} options={policies.map((p) => ({ value: p.policy_id, label: p.name }))} />
+              : <p className="text-body-sm text-text-secondary">{tpl.policies === 'ALL' ? 'Mọi người đã có Face ID, thuộc bất kỳ chính sách nào.' : 'Không dựa trên hồ sơ Face ID: áp dụng cho người không khớp hồ sơ nào.'}</p>}
+            <span className="text-caption text-text-secondary">Quy tắc chỉ chạy ở những khu vực nằm trong "Khu vực kiểm soát" của chính sách, vì chỉ ở đó thiết bị có mẫu khuôn mặt của nhóm này.</span>
+          </div>
           <div className="grid grid-cols-2 gap-space-md">
             <label className="flex flex-col gap-1 text-label-md font-semibold">Mục đích xử lý (bắt buộc)
               <Select wrap label="Mục đích xử lý" value={purpose} options={PURPOSES.map((p) => ({ value: p.id, label: `${p.name}${p.status === 'active' ? '' : ' (chờ đồng ý)'}` }))} onChange={(v) => { setPurpose(v); setDry(null); }} />
