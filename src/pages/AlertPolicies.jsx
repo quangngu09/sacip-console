@@ -20,7 +20,7 @@ export default function AlertPolicies() {
 
   return (
     <div>
-      <p className="text-body-sm text-text-secondary mb-space-sm">Ai nhận, qua kênh nào, gộp ra sao và leo thang khi chưa ai tiếp nhận. Trang An ninh & ngoại lệ chỉ nhận cảnh báo, không cấu hình ở đó.</p>
+      <p className="text-body-sm text-text-secondary mb-space-sm">Ai nhận, qua kênh nào, gộp ra sao và leo thang khi chưa ai tiếp nhận. Trang Sự cố an ninh chỉ nhận cảnh báo, không cấu hình ở đó.</p>
       <Banner className="mb-space-md" icon="rule" title="Hai luồng tách hẳn.">
         Sự kiện <b>an ninh</b> gửi bảo vệ của zone trong 2 giây. Sự kiện <b>học vụ</b> (đi muộn, vắng giữa giờ, ngoại lệ giảng dạy) không bao giờ gửi bảo vệ, không phát còi và không đẩy thông báo cho GV giữa giờ giảng: chỉ tổng hợp sau khi chốt tiết.
       </Banner>

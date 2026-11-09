@@ -14,7 +14,7 @@ export const SUBJECT_TYPE = {
 export const SOURCE = {
   APP: { label: 'App MyDaiNam', short: 'App', icon: 'smartphone', detail: (poses) => `${poses} tư thế` },
   CARD_DB: { label: 'Ảnh thẻ CSDL', short: 'Ảnh thẻ', icon: 'photo_library', detail: () => 'ảnh có sẵn' },
-  COUNTER: { label: 'Đăng ký tại quầy', short: 'Tại quầy', icon: 'storefront', detail: (poses) => `Kiosk, ${poses} tư thế` },
+  COUNTER: { label: 'Đăng ký tại quầy', short: 'Tại quầy', icon: 'storefront', detail: (poses) => `${poses} tư thế, có cán bộ hỗ trợ` },
 };
 
 /**
@@ -148,11 +148,15 @@ export const ACTION = {
   POLICY_DRY_RUN: 'Chạy thử chính sách',
   TRIGGER_EMITTED: 'Gửi sự kiện sang hệ thống ngoài',
   SOURCE_SYNC: 'Đồng bộ nguồn dữ liệu',
-  KIOSK_CAPTURE: 'Kiosk chụp ảnh',
   AUDIT_EXPORT_SIGNED: 'Xuất báo cáo có chữ ký',
   AUDIT_CHAIN_VERIFIED: 'Kiểm tra toàn vẹn nhật ký',
   RISK_FLAGGED: 'Gắn cờ rủi ro',
   RISK_CLEARED: 'Gỡ cờ rủi ro',
+  ANOMALY_RESOLVED: 'Đóng cảnh báo lệch chuẩn AI',
+  INCIDENT_ACKNOWLEDGED: 'Tiếp nhận sự cố an ninh',
+  INCIDENT_CLOSED: 'Đóng sự cố an ninh',
+  VIEW_INCIDENT_EVIDENCE: 'Xem minh chứng sự cố',
+  ATTENDANCE_CASE_DECIDED: 'Xử lý ngoại lệ điểm danh',
   JOB_CONTRACT_CHECK: 'Quét hợp đồng sắp hết hạn',
   SPACE_CREATED: 'Thêm khu vực',
   SPACE_APPROVED: 'Duyệt hạ tầng khu vực',
@@ -165,15 +169,30 @@ export const ACTION = {
   ORG_UNIT_ACTIVATED: 'Dùng lại đơn vị',
   ADMIN_ACTION: 'Thao tác quản trị',
   VIEW_SENSITIVE: 'Xem dữ liệu nhạy cảm',
+  MOVEMENT_LOOKUP_REQUESTED: 'Yêu cầu tra cứu hành trình',
+  MOVEMENT_LOOKUP_APPROVED: 'Duyệt tra cứu hành trình',
+  MOVEMENT_LOOKUP_REJECTED: 'Từ chối tra cứu hành trình',
+  MOVEMENT_JOURNEY_VIEWED: 'Xem hành trình một người',
   SYSTEM_EVENT: 'Sự kiện hệ thống',
 };
 
 /** Vai trò và quyền (phân quyền theo vai trò, Gói 6 Blueprint). */
 export const ROLES = {
   ADMIN: { label: 'Quản trị hệ thống', can: ['*'] },
-  AUDITOR: { label: 'Kiểm toán viên trưởng', can: ['view', 'audit', 'view_original', 'consent'] },
+  AUDITOR: { label: 'Kiểm toán viên trưởng', can: ['view', 'audit', 'view_original', 'consent', 'movement'] },
   REGISTRAR: { label: 'Cán bộ Phòng Đào tạo', can: ['view', 'approve', 'view_original', 'profile_write', 'consent'] },
-  SECURITY: { label: 'Trực an ninh', can: ['view', 'security', 'lock'] },
+  SECURITY: { label: 'Trực an ninh', can: ['view', 'security', 'lock', 'movement'] },
 };
 
 export const can = (role, perm) => ROLES[role].can.includes('*') || ROLES[role].can.includes(perm);
+
+/**
+ * Vai trò trên Console được xác nhận một bước duyệt. Bước của đơn vị ngoài (GVCN, trưởng đơn vị, KTX…)
+ * do Phòng Đào tạo hoặc Quản trị ghi nhận thay; quản trị viên được ký mọi bước.
+ */
+export const STEP_APPROVERS = {
+  ADVISOR: ['REGISTRAR'], REGISTRAR: ['REGISTRAR'], UNIT_HEAD: ['REGISTRAR'], DORM: ['REGISTRAR'], HOST: ['REGISTRAR'],
+  CONTRACT_OWNER: ['SECURITY'], HCQT: ['SECURITY'], DPO: ['AUDITOR'],
+};
+export const canApproveStep = (role, stepRole) => can(role, '*') || (STEP_APPROVERS[stepRole] || []).includes(role);
+export const stepApproverText = (stepRole) => (STEP_APPROVERS[stepRole] || []).map((r) => ROLES[r].label).concat(ROLES.ADMIN.label).join(' hoặc ');

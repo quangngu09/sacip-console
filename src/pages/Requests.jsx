@@ -3,7 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { AiCard, Banner, Chip, ConfirmReason, DataBoundary, Empty, FaceThumb, Icon, PageHeader, SearchInput, Select, SourceBadge, StateBadge, SubjectTypeChip, Tabs, useCountdown } from '../components/ui';
 import { useApp } from '../store';
 import { approveRequest, cancelRequest, policyFor, rejectRequest, requestOriginalImage } from '../api/client';
-import { REQUEST_STATUS, REQUEST_TYPE, TRIGGER_TARGET, consentLabel } from '../api/enums';
+import { REQUEST_STATUS, REQUEST_TYPE, TRIGGER_TARGET, canApproveStep, consentLabel, stepApproverText } from '../api/enums';
+import { channelsText } from '../lib/policyText';
 import { fmtDateTime, fmtPercent, fmtRelative, slaState } from '../lib/format';
 import { contextLine } from './Profiles';
 
@@ -21,8 +22,9 @@ const PRIORITY = { URGENT: ['bg-status-rejected text-white', 'Khẩn cấp'], HI
 export default function Requests() {
   const { data } = useApp();
   const [params, setParams] = useSearchParams();
-  const [tab, setTab] = useState('pending');
-  const [type, setType] = useState('all');
+  // ?loai=RESCAN&tab=pending: liên kết từ Tổng quan mở sẵn đúng bộ lọc.
+  const [tab, setTab] = useState(() => params.get('tab') || 'pending');
+  const [type, setType] = useState(() => params.get('loai') || 'all');
   const [q, setQ] = useState('');
   const sel = params.get('id');
   const subjectOf = (r) => data.subjects.find((s) => s.subject_id === r.subject_id);
@@ -106,7 +108,7 @@ const Metric = ({ label, value, sub, tone }) => (
 const tone = (ok, warn) => (ok ? 'text-status-active' : warn ? 'text-status-pending' : 'text-status-rejected');
 
 function RequestDetail({ r, s }) {
-  const { data, call, toast, can, actor } = useApp();
+  const { data, call, toast, can, actor, role } = useApp();
   const [ask, setAsk] = useState(null);
   const [signed, setSigned] = useState(null);
   const left = useCountdown(signed?.expires_at, () => setSigned(null));
@@ -118,7 +120,8 @@ function RequestDetail({ r, s }) {
   const stepIdx = r.approvals.findIndex((a) => !a.decision);
   const lastStep = stepIdx === r.approvals.length - 1;
   const awaitingSecond = r.two_person && lastStep && !!r.first_confirm;
-  const permOk = isWithdraw ? can('consent') : can('approve');
+  const step = r.approvals[stepIdx];
+  const permOk = !!step && canApproveStep(role, step.role);
   const sameAsFirst = awaitingSecond && r.first_confirm.by_id === actor.id;
   const events = data.events.filter((e) => e.ref === r.request_id || (e.ref === s.code && e.at >= r.submitted_at)).sort((a, b2) => b2.at.localeCompare(a.at));
   const sla = pending && slaState(r.sla_due);
@@ -127,7 +130,7 @@ function RequestDetail({ r, s }) {
   const approveLabel = isWithdraw ? 'Xác nhận rút đồng ý' : r.two_person && lastStep ? (awaitingSecond ? 'Xác nhận người thứ 2' : 'Xác nhận người thứ 1') : lastStep ? 'Phê duyệt' : `Duyệt bước ${stepIdx + 1}`;
 
   const outcome = {
-    RESCAN: `Mở quyền chụp lại qua ${b.rescan_channels.map((c) => (c === 'APP' ? 'App MyDaiNam' : 'Kiosk')).join(', ')} trong ${b.rescan_validity_hours} giờ, ${b.rescan_max_uses} lần; gửi thông báo tới người gửi.`,
+    RESCAN: `Mở quyền chụp lại qua ${channelsText(b.rescan_channels)} trong ${b.rescan_validity_hours} giờ, ${b.rescan_max_uses} lần; gửi thông báo tới người gửi.`,
     NEW_REGISTRATION: `Kích hoạt hiệu lực Face ID; ${s.subject_type === 'STUDENT' ? 'báo Hệ thống Đào tạo trạng thái VERIFIED; ' : ''}nạp dữ liệu xuống thiết bị kiểm soát ra vào.`,
     REVOKE: 'Thu hồi quyền nhận diện tại mọi cổng và camera ngay lập tức.',
     EXTEND: 'Gia hạn hiệu lực đến 31/12/2027 và cập nhật thiết bị kiểm soát ra vào.',
@@ -266,7 +269,7 @@ function RequestDetail({ r, s }) {
           {isWithdraw && <span className="text-caption text-text-secondary flex items-center gap-1"><Icon name="gavel" size={16} />Quyền rút đồng ý không thể bị từ chối.</span>}
           <button className="btn text-text-secondary hover:bg-surface-container-low" title="Mô phỏng người gửi tự hủy trên App" onClick={async () => { await call(cancelRequest, r.request_id); toast('Người gửi đã hủy yêu cầu', r.request_id, 'warn'); }}><Icon name="smartphone" />Mô phỏng người gửi hủy</button>
           <div className="ml-auto flex items-center gap-2">
-            {!permOk && <span className="text-caption text-text-secondary">Vai trò hiện tại không được duyệt.</span>}
+            {!permOk && step && <span className="text-caption text-text-secondary">Bước này do {stepApproverText(step.role)} xác nhận.</span>}
             {sameAsFirst && <span className="text-caption text-status-pending">Bạn đã xác nhận lần 1.</span>}
             <button className="btn-primary" disabled={!permOk || sameAsFirst || consentGate} onClick={() => setAsk('approve')}><Icon name="check_circle" />{approveLabel}</button>
           </div>

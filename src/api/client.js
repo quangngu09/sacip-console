@@ -3,9 +3,10 @@
 // Toàn bộ trạng thái nằm trong biến `db` của module này, giống một máy chủ chạy trong trình duyệt.
 
 import * as seed from './db';
-import { ROLES } from './enums';
+import { ROLES, canApproveStep, stepApproverText } from './enums';
 import { validatePolicy, validateOwnership, diffConfig } from './policyValidation';
 import { SPACE_TREE, DEVICES } from '../data/mock';
+import { LOOKUPS, PERSON_JOURNEY } from '../data/movement';
 
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const wait = (ms = 180 + Math.random() * 220) => new Promise((r) => setTimeout(r, ms));
@@ -41,15 +42,18 @@ const db = {
   coverage: clone(seed.COVERAGE),
   backlog: clone(seed.BACKLOG),
   anomalies: clone(seed.ANOMALIES),
+  incidents: clone(seed.INCIDENTS),
+  attendanceCases: clone(seed.ATTENDANCE_CASES),
   auditMetrics: clone(seed.AUDIT_METRICS),
   notifications: clone(seed.NOTIFICATIONS),
   orgTree: clone(seed.ORG_TREE),
   spaces: clone(SPACE_TREE),
   hrPendingUnits: clone(seed.HR_PENDING_UNITS),
   jobs: clone(seed.JOBS),
+  lookups: clone(LOOKUPS),
   audit: [],
 };
-let seq = { log: 90410, req: 8842, evt: 55214 };
+let seq = { log: 90410, req: 8842, evt: 55214, lookup: 42 };
 
 /** Người đang thao tác. Đổi vai trò ở thanh trên cùng tương đương đăng nhập bằng tài khoản khác. */
 export const ACTORS = {
@@ -84,7 +88,6 @@ function appendAudit({ action_code, target, detail, by = actor }) {
 
 // ---------- Tra cứu nội bộ ----------
 const subjectById = (id) => db.subjects.find((s) => s.subject_id === id);
-export const findSubjectByCode = (code) => clone(db.subjects.find((s) => s.code.toLowerCase() === String(code).trim().toLowerCase()) || null);
 const policyOf = (type) => db.policies.find((p) => p.target_subject_type === type);
 const activeConfig = (p) => p.versions.find((v) => v.version === p.current_version).config;
 export const policyFor = (type) => {
@@ -141,6 +144,23 @@ const requireConsent = (s, what) => {
   if (s.states.consent !== 'ACTIVE') throw new ApiError(`${s.name} chưa có xác nhận đồng ý hợp lệ nên không thể ${what}.`);
 };
 
+const pendingOf = (s, type) => db.requests.find((r) => r.subject_id === s.subject_id && r.status === 'pending' && (!type || r.request_type === type));
+
+/** Trạng thái "Yêu cầu" của hồ sơ luôn suy ra từ hàng đợi, để đóng một yêu cầu không xóa mất yêu cầu khác còn chờ. */
+function syncRequestState(s) {
+  const grant = s.rescan_grant && new Date(s.rescan_grant.expires_at) > new Date() && s.rescan_grant.uses_left > 0;
+  s.states.request = pendingOf(s) ? 'OPEN' : grant ? 'RESCAN_GRANTED' : 'NONE';
+}
+
+/** Chuyển một người giữa các nhóm trong thống kê đồng ý, giữ tổng không đổi. */
+function moveConsentStat(s, to) {
+  const cs = db.consentStats;
+  const from = s.states.consent === 'ACTIVE' ? (s.consent_version === 'v1.2' ? 'active_current' : 'active_old') : s.states.consent === 'WITHDRAWN' ? 'withdrawn' : 'pending';
+  if (from === to) return;
+  cs[from] = Math.max(0, cs[from] - 1);
+  cs[to] += 1;
+}
+
 // ---------- Đọc ----------
 /** GET /bootstrap — toàn bộ dữ liệu ban đầu cho Console. */
 export function snapshot() {
@@ -178,6 +198,8 @@ function applyValidity(s, action, reason) {
   }
   if (action === 'LOCK' && s.states.validity === 'LOCKED') throw new ApiError(`${s.name} đã bị khóa.`);
   if (action === 'ACTIVATE' && s.states.validity === 'ACTIVE') throw new ApiError(`${s.name} đã đang hiệu lực.`);
+  const reg = action === 'ACTIVATE' && pendingOf(s, 'NEW_REGISTRATION');
+  if (reg) throw new ApiError(`${s.name} có ${reg.request_id} đang chờ duyệt; hãy kích hoạt bằng cách duyệt yêu cầu trong Hộp yêu cầu.`);
   s.states.validity = a.to;
   if (a.to === 'ACTIVE' && !s.valid_until) s.valid_until = '30/06/2027';
   appendAudit({ action_code: a.code, target: s.code, detail: reason });
@@ -206,7 +228,7 @@ function openRequest(s, type, reason, channel = 'ADMIN') {
     approver_id: null, approved_at: null, rejection_reason: null,
   };
   db.requests.unshift(r);
-  s.states.request = 'OPEN';
+  syncRequestState(s);
   appendAudit({ action_code: 'CREATE_REQUEST', target: s.code, detail: `${r.request_id}: ${type} — ${reason}` });
   return r;
 }
@@ -226,6 +248,7 @@ export async function bulkAction(ids, action, reason) {
     try {
       if (action === 'RESCAN') openRequest(s, 'RESCAN', reason);
       else if (action === 'REMIND') {
+        if (s.states.consent !== 'ACTIVE') throw new ApiError('chưa có đồng ý hợp lệ');
         if (s.states.collection === 'COMPLETED') throw new ApiError('đã thu thập xong');
         appendAudit({ action_code: 'SEND_REMINDER', target: s.code, detail: reason });
       } else applyValidity(s, action, reason);
@@ -243,29 +266,30 @@ function finalize(r, s, note) {
   const events = [];
   if (r.request_type === 'RESCAN') {
     const exp = new Date(Date.now() + cfg.biometric.rescan_validity_hours * 3600 * 1000).toISOString();
-    s.states.request = 'RESCAN_GRANTED';
     s.rescan_grant = { channels: cfg.biometric.rescan_channels, expires_at: exp, uses_left: cfg.biometric.rescan_max_uses };
     events.push(emit(s.subject_type, 'NOTIFY_RESCAN', r.request_id, { subject_id: s.subject_id, decision: 'APPROVED', rescan_channels: cfg.biometric.rescan_channels, rescan_expires_at: exp, uses: cfg.biometric.rescan_max_uses }));
   } else if (r.request_type === 'NEW_REGISTRATION') {
-    s.states.request = 'NONE'; s.states.collection = 'COMPLETED'; s.states.validity = 'ACTIVE'; s.valid_until ||= '30/06/2027';
+    s.states.collection = 'COMPLETED'; s.states.validity = 'ACTIVE'; s.valid_until ||= '30/06/2027';
     events.push(notifyAcademic(s, r.request_id));
     events.push(emit(s.subject_type, 'ACCESS_SYNC', s.code, accessPayload(s)));
   } else if (r.request_type === 'REVOKE') {
-    s.states.request = 'NONE'; s.states.validity = 'REVOKED';
+    s.states.validity = 'REVOKED';
     events.push(emit(s.subject_type, 'ACCESS_SYNC', s.code, accessPayload(s)));
   } else if (r.request_type === 'EXTEND') {
-    s.states.request = 'NONE'; s.states.validity = 'ACTIVE'; s.valid_until = '31/12/2027';
+    s.states.validity = 'ACTIVE'; s.valid_until = '31/12/2027';
     events.push(emit(s.subject_type, 'ACCESS_SYNC', s.code, accessPayload(s)));
   } else if (r.request_type === 'WITHDRAW_CONSENT') {
     const days = cfg.workflow.retention_days_after_withdraw;
-    s.states.request = 'NONE'; s.states.consent = 'WITHDRAWN'; s.states.validity = 'REVOKED';
+    // Rút đồng ý có hiệu lực ngay khi người dùng gửi trên App; nếu chưa ghi nhận thì ghi nhận lúc xác nhận.
+    moveConsentStat(s, 'withdrawn');
+    s.states.consent = 'WITHDRAWN'; s.states.validity = 'REVOKED';
     const er = db.erasures.find((x) => x.subject_id === s.subject_id);
     const due = new Date(Date.now() + days * 24 * 3600 * 1000).toISOString();
     if (er) Object.assign(er, { status: 'IN_PROGRESS', due_at: due, steps: { lock: true, images: false, template: false, notice: false } });
     else db.erasures.unshift({ subject_id: s.subject_id, code: s.code, name: s.name, requested_at: r.submitted_at, due_at: due, status: 'IN_PROGRESS', steps: { lock: true, images: false, template: false, notice: false } });
-    db.consentStats.withdrawn += 1;
     events.push(emit(s.subject_type, 'ACCESS_SYNC', s.code, accessPayload(s)));
   }
+  syncRequestState(s);
   appendAudit({ action_code: r.request_type === 'WITHDRAW_CONSENT' ? 'CONSENT_WITHDRAW_CONFIRMED' : 'APPROVE_REQUEST', target: s.code, detail: `${r.request_id}${note ? ` — ${note}` : ''}` });
   return events.filter(Boolean);
 }
@@ -279,6 +303,7 @@ export async function approveRequest(requestId, note) {
   if (!['WITHDRAW_CONSENT', 'REVOKE'].includes(r.request_type)) requireConsent(s, 'phê duyệt yêu cầu');
   const i = r.approvals.findIndex((a) => !a.decision);
   const last = i === r.approvals.length - 1;
+  if (!canApproveStep(actor.role, r.approvals[i].role)) throw new ApiError(`Bước "${r.approvals[i].label}" do ${stepApproverText(r.approvals[i].role)} xác nhận.`);
   if (r.two_person && last) {
     if (!r.first_confirm) {
       r.first_confirm = { by: actor.name, by_id: actor.id, at: iso(), note };
@@ -302,11 +327,14 @@ export async function rejectRequest(requestId, reason) {
   const r = db.requests.find((x) => x.request_id === requestId);
   const s = subjectById(r.subject_id);
   if (r.request_type === 'WITHDRAW_CONSENT') throw new ApiError('Không được từ chối yêu cầu rút đồng ý.');
+  if (r.status !== 'pending') throw new ApiError('Yêu cầu này đã được xử lý.');
+  const step = r.approvals.find((a) => !a.decision);
+  if (step && !canApproveStep(actor.role, step.role)) throw new ApiError(`Bước "${step.label}" do ${stepApproverText(step.role)} xử lý.`);
   if (!reason || reason.trim().length < 10) throw new ApiError('Phải nhập lý do từ chối (tối thiểu 10 ký tự).');
   Object.assign(r, { status: 'rejected', rejection_reason: reason, approver_id: actor.name, approved_at: iso() });
   const i = r.approvals.findIndex((a) => !a.decision);
   if (i >= 0) Object.assign(r.approvals[i], { decision: 'REJECTED', approver_id: actor.name, approved_at: iso(), note: reason });
-  s.states.request = 'NONE';
+  syncRequestState(s);
   const ev = r.request_type === 'RESCAN'
     ? emit(s.subject_type, 'NOTIFY_RESCAN', r.request_id, { subject_id: s.subject_id, decision: 'REJECTED', rejection_reason: reason })
     : (() => { const e = { event_id: `EVT-${++seq.evt}`, trigger_id: 'NOTIFY_DECISION', target: 'NOTIFICATION', transport: 'KAFKA', destination: 'notify.push', at: iso(), status: 'DELIVERED', ref: r.request_id, payload: { subject_id: s.subject_id, decision: 'REJECTED', rejection_reason: reason } }; db.events.push(e); return e; })();
@@ -319,8 +347,15 @@ export async function cancelRequest(requestId) {
   await wait();
   const r = db.requests.find((x) => x.request_id === requestId);
   const s = subjectById(r.subject_id);
+  if (r.status !== 'pending') throw new ApiError('Yêu cầu này đã được xử lý.');
   r.status = 'cancelled';
-  s.states.request = 'NONE';
+  // Hủy rút đồng ý: người dùng giữ lại đồng ý trước đó và bỏ phiếu xóa chưa bắt đầu. Hồ sơ vẫn khóa đến khi cán bộ mở lại.
+  if (r.request_type === 'WITHDRAW_CONSENT' && s.states.consent === 'WITHDRAWN') {
+    moveConsentStat(s, s.consent_version === 'v1.2' ? 'active_current' : 'active_old');
+    s.states.consent = 'ACTIVE';
+    db.erasures = db.erasures.filter((e) => !(e.subject_id === s.subject_id && e.status === 'PENDING_CONFIRM'));
+  }
+  syncRequestState(s);
   appendAudit({ action_code: 'CANCEL_REQUEST', target: s.code, detail: r.request_id, by: { id: 'APP', name: 'App MyDaiNam', ip: '113.190.22.87' } });
 }
 
@@ -386,8 +421,14 @@ export async function dryRunPolicy(policyId, config) {
 
 // ---------- Đồng ý ----------
 /** POST /consents/reconfirm  body: { scope: 'OLD_VERSION' | 'PENDING' } → gửi yêu cầu xác nhận điều khoản hiện hành. */
-export async function requestReconsent(scope) {
+export async function requestReconsent(scope, subjectId) {
   await wait();
+  const one = subjectId && subjectById(subjectId);
+  if (one) {
+    db.events.push({ event_id: `EVT-${++seq.evt}`, trigger_id: 'NOTIFY_RECONSENT', target: 'NOTIFICATION', transport: 'KAFKA', destination: 'notify.push', at: iso(), status: 'DELIVERED', ref: one.code, payload: { subject_id: one.subject_id, consent_version: 'v1.2' } });
+    appendAudit({ action_code: 'CONSENT_RECONFIRM_REQUESTED', target: one.code, detail: 'Gửi điều khoản v1.2 tới App MyDaiNam' });
+    return { recipients: 1 };
+  }
   const n = scope === 'OLD_VERSION' ? db.consentStats.active_old : db.consentStats.pending;
   const e = { event_id: `EVT-${++seq.evt}`, trigger_id: 'NOTIFY_RECONSENT', target: 'NOTIFICATION', transport: 'KAFKA', destination: 'notify.push', at: iso(), status: 'DELIVERED', ref: 'v1.2', payload: { audience: scope, recipients: n, consent_version: 'v1.2' } };
   db.events.push(e);
@@ -395,15 +436,26 @@ export async function requestReconsent(scope) {
   return { recipients: n };
 }
 
-/** POST /subjects/{id}/consent  body: { version, channel } → ký tại quầy hoặc trên App. */
-export async function signConsent(subjectId, channel) {
+/** Mô phỏng người dùng bấm đồng ý điều khoản v1.2 trên App MyDaiNam: POST /consents (gọi từ App). */
+export async function confirmConsentOnApp(subjectId) {
   await wait();
   const s = subjectById(subjectId);
-  const wasNew = s.states.consent !== 'ACTIVE';
+  if (s.states.consent === 'WITHDRAWN') throw new ApiError('Người này đã rút đồng ý; chỉ chính họ đăng ký lại được trên App.');
+  if (s.states.consent === 'ACTIVE' && s.consent_version === 'v1.2') throw new ApiError('Đã đồng ý điều khoản hiện hành.');
+  moveConsentStat(s, 'active_current');
   s.states.consent = 'ACTIVE'; s.consent_version = 'v1.2';
-  if (wasNew) { db.consentStats.pending = Math.max(0, db.consentStats.pending - 1); db.consentStats.active_current += 1; }
-  appendAudit({ action_code: 'CONSENT_SIGNED', target: s.code, detail: `Điều khoản v1.2 qua ${channel}` });
+  appendAudit({ action_code: 'CONSENT_SIGNED', target: s.code, detail: 'Điều khoản v1.2 qua App MyDaiNam', by: { id: 'APP', name: 'App MyDaiNam', ip: '113.190.22.87' } });
   return clone(s);
+}
+
+/** POST /anomalies/{id}/resolve  body: { note } → đóng cảnh báo bất thường sau khi đã xử lý. */
+export async function resolveAnomaly(id, note) {
+  await wait();
+  const a = db.anomalies.find((x) => x.id === id);
+  if (a.status === 'RESOLVED') throw new ApiError('Cảnh báo đã được đóng.');
+  Object.assign(a, { status: 'RESOLVED', resolved_by: actor.name, resolved_at: iso(), resolution: note });
+  appendAudit({ action_code: 'ANOMALY_RESOLVED', target: a.ref, detail: `${a.id}: ${a.title} — ${note}` });
+  return clone(a);
 }
 
 const ERASE_ORDER = ['lock', 'images', 'template', 'notice'];
@@ -464,53 +516,95 @@ export async function exportAudit(rows) {
   return { file, digest, count: rows.length };
 }
 
+// ---------- Tra cứu hành trình (Lượt ra vào khu vực, R-013) ----------
+// Giống tra lịch sử một biển số: chỉ khi có sự cố, có lý do, một người thứ hai khác người gửi duyệt.
+const LOOKUP_APPROVERS = ['AUDITOR', 'ADMIN'];
+
+/** POST /movement/lookups  body: { target, date, incident, reason } */
+export async function requestMovementLookup({ target, date, incident, reason }) {
+  await wait();
+  const code = String(target || '').trim().toUpperCase();
+  if (!code) throw new ApiError('Nhập mã người cần tra cứu.');
+  if (!String(incident || '').trim()) throw new ApiError('Phải gắn với một mã sự cố.');
+  if (!reason || reason.trim().length < 10) throw new ApiError('Lý do tối thiểu 10 ký tự.');
+  if (db.lookups.some((l) => l.status === 'pending' && l.target === code && l.date === date)) throw new ApiError(`Đã có yêu cầu tra cứu ${code} ngày này đang chờ duyệt.`);
+  const l = { id: `LK-${String(++seq.lookup).padStart(4, '0')}`, at: iso(), by: actor.name, by_id: actor.id, target: code, date, incident: incident.trim(), reason: reason.trim(), approver: null, decided_at: null, status: 'pending' };
+  db.lookups.unshift(l);
+  appendAudit({ action_code: 'MOVEMENT_LOOKUP_REQUESTED', target: code, detail: `${l.id} ngày ${date}, sự cố ${l.incident}: ${l.reason}` });
+  return clone(l);
+}
+
+/** POST /movement/lookups/{id}/approve | /reject  body: { note } → người duyệt phải khác người gửi. */
+export async function decideMovementLookup(id, approve, note) {
+  await wait();
+  const l = db.lookups.find((x) => x.id === id);
+  if (l.status !== 'pending') throw new ApiError('Yêu cầu này đã được xử lý.');
+  if (!LOOKUP_APPROVERS.includes(actor.role)) throw new ApiError('Chỉ Kiểm toán viên trưởng hoặc Quản trị được duyệt tra cứu.');
+  if (l.by_id === actor.id) throw new ApiError('Người duyệt phải khác người gửi yêu cầu. Đổi vai trò ở góc trên bên phải để mô phỏng.');
+  if (!approve && (!note || note.trim().length < 10)) throw new ApiError('Từ chối phải nêu lý do (tối thiểu 10 ký tự).');
+  Object.assign(l, { status: approve ? 'approved' : 'rejected', approver: actor.name, decided_at: iso(), note: note || null });
+  appendAudit({ action_code: approve ? 'MOVEMENT_LOOKUP_APPROVED' : 'MOVEMENT_LOOKUP_REJECTED', target: l.target, detail: `${l.id}${note ? ` — ${note}` : ''}` });
+  return clone(l);
+}
+
+/** GET /movement/lookups/{id}/journey → chỉ trả khi đã duyệt; mỗi lượt mở đều ghi nhật ký truy vết. */
+export async function openMovementJourney(id) {
+  await wait();
+  const l = db.lookups.find((x) => x.id === id);
+  if (l.status !== 'approved') throw new ApiError('Chỉ xem được hành trình của yêu cầu đã duyệt.');
+  appendAudit({ action_code: 'MOVEMENT_JOURNEY_VIEWED', target: l.target, detail: `${l.id} ngày ${l.date}, sự cố ${l.incident}` });
+  const j = PERSON_JOURNEY;
+  const s = db.subjects.find((x) => x.code === l.target);
+  return j.id === l.target ? clone(j) : { id: l.target, name: s?.name || l.target, cls: s ? s.code : '', rows: [], gaps: ['Không có lượt ra vào nào được ghi trong ngày này (dữ liệu minh họa chỉ có cho SV-2023-8891).'] };
+}
+
+// ---------- Sự cố an ninh ----------
+const incidentById = (id) => db.incidents.find((x) => x.id === id);
+
+/** POST /incidents/{id}/ack → trực an ninh nhận xử lý. */
+export async function ackIncident(id) {
+  await wait();
+  const e = incidentById(id);
+  if (e.state !== 'open') throw new ApiError('Sự cố đã được tiếp nhận.');
+  Object.assign(e, { state: 'ack', ack_by: actor.name, ack_at: iso() });
+  appendAudit({ action_code: 'INCIDENT_ACKNOWLEDGED', target: e.id, detail: e.title });
+  return clone(e);
+}
+
+/** POST /incidents/{id}/close  body: { note } */
+export async function closeIncident(id, note) {
+  await wait();
+  const e = incidentById(id);
+  if (e.state === 'closed') throw new ApiError('Sự cố đã đóng.');
+  if (!note || note.trim().length < 10) throw new ApiError('Ghi rõ đã xử lý thế nào (tối thiểu 10 ký tự).');
+  Object.assign(e, { state: 'closed', closed_by: actor.name, closed_at: iso(), resolution: note });
+  appendAudit({ action_code: 'INCIDENT_CLOSED', target: e.id, detail: `${e.title} — ${note}` });
+  return clone(e);
+}
+
+/** POST /incidents/{id}/evidence  body: { reason } → mở minh chứng video, ghi nhật ký như xem ảnh gốc. */
+export async function viewIncidentEvidence(id, reason) {
+  await wait();
+  const e = incidentById(id);
+  appendAudit({ action_code: 'VIEW_INCIDENT_EVIDENCE', target: e.id, detail: `Lý do: ${reason}` });
+  return { ok: true };
+}
+
+// ---------- Ngoại lệ học vụ (Lịch học & điểm danh) ----------
+/** POST /attendance/cases/{id}/decide  body: { accept, note } → Phòng Đào tạo quyết định. */
+export async function decideAttendanceCase(id, accept, note) {
+  await wait();
+  const c = db.attendanceCases.find((x) => x.id === id);
+  if (c.status !== 'open') throw new ApiError('Ngoại lệ này đã được xử lý.');
+  if (!['REGISTRAR', 'ADMIN'].includes(actor.role)) throw new ApiError('Chỉ Phòng Đào tạo hoặc Quản trị xử lý ngoại lệ học vụ.');
+  if (!note || note.trim().length < 10) throw new ApiError('Nhập căn cứ quyết định (tối thiểu 10 ký tự).');
+  Object.assign(c, { status: accept ? 'accepted' : 'rejected', decided_by: actor.name, decided_at: iso(), note });
+  appendAudit({ action_code: 'ATTENDANCE_CASE_DECIDED', target: c.id, detail: `${c.title}: ${accept ? 'chấp nhận' : 'không chấp nhận'} — ${note}` });
+  return clone(c);
+}
+
 /** Ghi nhật ký cho các thao tác chưa có endpoint riêng (trang Không gian, Thiết bị, An ninh…). */
 export function logAction(action_code, target, detail) { appendAudit({ action_code, target, detail }); }
-
-// ---------- Kiosk ----------
-/** POST /kiosk/enroll  body: { subject_code, poses:[{name, score}], device_id } */
-export async function kioskEnroll(code, poses, deviceId) {
-  await wait(500);
-  const s = db.subjects.find((x) => x.code === code);
-  if (!s) throw new ApiError('Không tìm thấy hồ sơ.');
-  requireConsent(s, 'thu thập Face ID');
-  const p = policyOf(s.subject_type);
-  const cfg = activeConfig(p).biometric;
-  if (!cfg.accepted_sources.includes('COUNTER')) throw new ApiError(`Chính sách ${p.policy_id} không chấp nhận đăng ký tại quầy.`);
-  if (poses.length < cfg.pose_count) throw new ApiError(`Chính sách yêu cầu ${cfg.pose_count} tư thế, mới chụp ${poses.length}.`);
-  const minScore = Math.min(...poses.map((x) => x.score));
-  const avg = Math.round(poses.reduce((a, x) => a + x.score, 0) / poses.length);
-  // Chụp lại thì tạo phiên bản mẫu mới, để hệ thống nhận biết mẫu cũ đã bị thay.
-  const rescan = s.states.request === 'RESCAN_GRANTED' && s.face_profile_id;
-  const fp = rescan ? s.face_profile_id.replace(/_v(\d+)$/, (_, n) => `_v${Number(n) + 1}`) : s.face_profile_id || `fp_${s.code.slice(-4)}_v1`;
-  Object.assign(s, { source: 'COUNTER', poses, ai_score: avg, face_profile_id: fp });
-  appendAudit({ action_code: 'KIOSK_CAPTURE', target: s.code, detail: `${deviceId}: ${poses.length} tư thế, điểm thấp nhất ${minScore}` });
-  const events = [];
-  // Ảnh kém hẳn ngưỡng thường là che mặt hoặc giơ ảnh in: gắn cờ để an ninh xem, không tự khóa hay từ chối.
-  if (minScore < cfg.min_quality - 15) events.push(raiseRisk(s, 'WATCH', `Điểm chất lượng ${minScore} tại ${deviceId}, thấp hơn ngưỡng ${cfg.min_quality} quá 15 điểm`, AI_ENGINE));
-  if (minScore < cfg.min_quality) {
-    s.states.collection = 'QUALITY_FAILED';
-    return { result: 'QUALITY_FAILED', min_quality: cfg.min_quality, minScore, events: events.filter(Boolean) };
-  }
-  s.states.collection = 'COMPLETED';
-  if (s.states.request === 'RESCAN_GRANTED') { s.states.request = 'NONE'; s.rescan_grant = null; }
-  // Trigger A bắn ngay khi thu thập hoàn tất, không chờ duyệt hiệu lực (Đặc tả Policy Engine §3).
-  events.push(notifyAcademic(s, s.code));
-  if (cfg.ai_auto_approve_enabled && avg >= cfg.ai_auto_approve_threshold) {
-    s.states.validity = 'ACTIVE'; s.valid_until ||= '30/06/2027';
-    appendAudit({ action_code: 'AUTO_APPROVE_FACE_ID', target: s.code, detail: `Điểm ${avg}% ≥ ngưỡng ${cfg.ai_auto_approve_threshold}% (${p.policy_id} ${p.current_version})`, by: AI_ENGINE });
-    events.push(emit(s.subject_type, 'ACCESS_SYNC', s.code, accessPayload(s)));
-    return { result: 'AUTO_APPROVED', score: avg, threshold: cfg.ai_auto_approve_threshold, face_profile_id: fp, events: events.filter(Boolean) };
-  }
-  // Đã có mẫu đang hiệu lực (chụp lại) thì mẫu mới thay ngay trên thiết bị; hồ sơ mới thì chờ duyệt.
-  if (['ACTIVE', 'EXPIRING'].includes(s.states.validity)) {
-    events.push(emit(s.subject_type, 'ACCESS_SYNC', s.code, accessPayload(s)));
-    return { result: 'UPDATED', score: avg, face_profile_id: fp, events: events.filter(Boolean) };
-  }
-  s.states.validity = 'PENDING_ACTIVATION';
-  const r = db.requests.find((x) => x.subject_id === s.subject_id && x.status === 'pending' && x.request_type === 'NEW_REGISTRATION') || openRequest(s, 'NEW_REGISTRATION', `Đăng ký tại quầy ${deviceId}, ${poses.length} tư thế.`, 'COUNTER');
-  return { result: 'PENDING_REVIEW', score: avg, threshold: cfg.ai_auto_approve_enabled ? cfg.ai_auto_approve_threshold : null, request_id: r.request_id, face_profile_id: fp, events: events.filter(Boolean) };
-}
 
 // ---------- Rủi ro ----------
 const AI_ENGINE = { id: 'AI-ENGINE', name: 'AI-ENGINE v4.1', ip: '10.20.0.31' };

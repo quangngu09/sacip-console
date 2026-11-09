@@ -1,6 +1,6 @@
 import { Banner, Chip, Icon } from '../components/ui';
 import { useRules } from '../data/rulesStore';
-import { DPIA, OPT_OUT_RULES, PURPOSES, RETENTION } from '../data/attendance';
+import { DPIA, PURPOSES, RETENTION } from '../data/attendance';
 import { fmtNumber, fmtPercent } from '../lib/format';
 
 /** Mục đích xử lý: đồng ý riêng cho từng mục đích (Luật 91/2025, Đ.9). Quy tắc chỉ bật được khi mục đích đã có đồng ý. */
@@ -32,20 +32,6 @@ export function PurposesTab() {
           </tbody>
         </table>
       </div>
-      <section className="card p-space-md">
-        <h2 className="text-headline-md flex items-center gap-2"><Icon name="face_retouching_off" className="text-primary-container" />Người không đồng ý Face ID</h2>
-        <p className="text-caption text-text-secondary mb-3">Ví dụ lớp 30 SV có 5 SV không đồng ý: 25 SV điểm danh bằng Face ID, 5 SV bằng QR động, chung một bảng kết quả.</p>
-        <ol className="grid grid-cols-2 gap-x-space-lg gap-y-3">
-          {OPT_OUT_RULES.map(([t, d], i) => (
-            <li key={t} className="flex gap-2.5">
-              <span className="w-6 h-6 rounded-full bg-primary-fixed text-primary-container text-caption font-semibold flex items-center justify-center shrink-0">{i + 1}</span>
-              <div><div className="text-label-md font-semibold">{t}</div><div className="text-caption text-text-secondary">{d}</div></div>
-            </li>
-          ))}
-        </ol>
-        <p className="text-caption text-status-pending mt-3 flex items-start gap-1"><Icon name="gavel" size={14} className="mt-0.5" />Việc camera phát hiện rồi loại bỏ khuôn mặt của người không đồng ý vẫn là một thao tác xử lý tức thời. Cần nêu trong DPIA, biển báo tại lớp và điều khoản v1.3; pháp chế xác nhận.</p>
-      </section>
-      <p className="text-caption text-text-secondary">Người không đồng ý một mục đích dùng phương thức thay thế không bất lợi (QR, RFID, GV điểm danh tay). Với GV / CBNV, phần quản lý giờ dạy cần đưa vào nội quy lao động và tham khảo ý kiến công đoàn; đồng ý của người lao động khó coi là tự nguyện.</p>
     </div>
   );
 }
@@ -83,7 +69,7 @@ export function RetentionTab() {
             </tbody>
           </table>
         </div>
-        <p className="text-caption text-text-secondary mt-1.5">Chỉ xử lý trong khung tiết đã có lịch và tại phòng của tiết đó; không ghép vết di chuyển giữa các phòng. "Mọi log được lưu" nghĩa là lưu và truy vết được, không phải ai cũng xem được: mỗi lượt xem timeline có mặt đều ghi nhật ký kiểm toán.</p>
+        <p className="text-caption text-text-secondary mt-1.5">Chỉ xử lý trong khung tiết đã có lịch và tại phòng của tiết đó; không ghép vết di chuyển giữa các phòng. "Mọi log được lưu" nghĩa là lưu và truy vết được, không phải ai cũng xem được: mỗi lượt xem timeline có mặt đều ghi nhật ký truy vết.</p>
       </section>
     </div>
   );

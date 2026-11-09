@@ -24,7 +24,7 @@ import PolicyEditor from './pages/PolicyEditor';
 import Integrations from './pages/Integrations';
 import OrgUnits from './pages/OrgUnits';
 import Soc from './pages/Soc';
-import Kiosk from './pages/Kiosk';
+import MovementLog from './pages/MovementLog';
 import { AiMonitor, AuditLog, Consents } from './pages/Misc';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -32,7 +32,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <AppProvider>
       <HashRouter>
         <Routes>
-          <Route path="/kiosk" element={<Kiosk />} />
           <Route element={<Layout />}>
             <Route index element={<Dashboard />} />
             <Route path="ho-so" element={<Profiles />} />
@@ -47,6 +46,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="tich-hop" element={<Integrations />} />
             <Route path="soc" element={<RequirePerm perm="security"><Soc /></RequirePerm>} />
             <Route path="giam-sat-ai" element={<AiMonitor />} />
+            <Route path="di-lai" element={<RequirePerm perm="movement"><MovementLog /></RequirePerm>} />
             <Route path="nhat-ky" element={<RequirePerm perm="audit"><AuditLog /></RequirePerm>} />
           </Route>
         </Routes>

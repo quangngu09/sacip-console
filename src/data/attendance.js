@@ -9,6 +9,7 @@ export const PURPOSES = [
   { id: 'P-ATT-CONT', name: 'Theo dõi có mặt trong tiết (rời / quay lại)', terms: 'v1.3 (dự thảo)', consented: 0, total: 24850, status: 'draft', basis: 'Đồng ý riêng', note: 'Mục đích mới, cần DPIA cập nhật trước khi bật.' },
   { id: 'P-LECTURER', name: 'Nhận diện giảng viên: bật ghi hình, thống kê giờ dạy', terms: 'v1.3 (dự thảo)', consented: 0, total: 1620, status: 'draft', basis: 'Nội quy lao động + đồng ý riêng', note: 'Cần tham khảo ý kiến công đoàn (BLLĐ 2019, Đ.118).' },
   { id: 'P-RECORD', name: 'Ghi hình và phát hành video bài giảng', terms: 'v1.3 (dự thảo)', consented: 0, total: 1620, status: 'draft', basis: 'Đồng ý + quyền tác giả của GV', note: 'Camera hướng bục giảng; GV duyệt trước khi phát hành.' },
+  { id: 'P-MOVE', name: 'Ghi lượt ra vào các zone (vào / ra)', terms: 'v1.3 (dự thảo)', consented: 0, total: 24850, status: 'draft', basis: 'Đồng ý riêng + biển báo tại zone; với GV / CBNV: nội quy lao động', note: 'Dữ liệu vị trí gắn với sinh trắc (Luật 91/2025). Chỉ tra cứu theo cá nhân khi có sự cố, 2 người duyệt.' },
   { id: 'P-DENSITY', name: 'Thống kê mật độ ẩn danh', terms: 'Không cần', consented: null, total: null, status: 'active', basis: 'Không định danh', note: 'Không so khớp khuôn mặt, chỉ đếm người.' },
 ];
 export const purposeOf = (id) => PURPOSES.find((p) => p.id === id);
@@ -21,6 +22,7 @@ export const RETENTION = [
   { kind: 'Minh chứng điểm danh (ảnh đã làm mờ)', keep: 'Đến hết hạn khiếu nại của học kỳ', basis: 'Trước đây 30 ngày, không đủ cho khiếu nại cuối kỳ', note: 'Mở ảnh gốc có ghi nhật ký' },
   { kind: 'Minh chứng sự cố an ninh', keep: '30 ngày; giữ lâu hơn khi đang điều tra', basis: 'An ninh khu vực hạn chế', note: 'Làm mờ; mở khi tiếp nhận sự cố' },
   { kind: 'Dữ liệu hiện diện của GV / CBNV', keep: 'Xóa khi chấm dứt hợp đồng', basis: 'Luật 91/2025, Đ.25', note: '—' },
+  { kind: 'Lượt ra vào zone (người, zone, hướng, thời điểm)', keep: '90 ngày rồi tự xóa; giữ lâu hơn khi gắn với sự cố đang điều tra', basis: 'Tối thiểu hóa; đủ cho điều tra sự cố', note: 'Không lưu ảnh, trừ cửa khu Hạn chế (ảnh mờ, 30 ngày)' },
   { kind: 'Mẫu khuôn mặt (vector)', keep: 'Xóa trong 20 ngày sau khi rút đồng ý hoặc thôi học', basis: 'NĐ 356/2025, Đ.5', note: '—' },
 ];
 
@@ -138,14 +140,3 @@ export const ROOM_SURVEY = {
   C202: { seats: 30, ied: 48, doorCam: true, measured: '15/10/2026' },
   A501: { seats: null, ied: 96, doorCam: true, measured: '15/10/2026' },
 };
-
-/** Cách xử lý người không đồng ý Face ID (hiển thị ở Đồng ý & bảo mật và Lịch học). */
-export const OPT_OUT_RULES = [
-  ['Không có mẫu khuôn mặt', 'Không thu thập, không tạo vector. Hồ sơ gắn cờ "Dùng phương thức thay thế"; GV chỉ thấy cờ này, không thấy lý do.'],
-  ['Gương mặt vẫn lọt vào camera thì bị loại bỏ ngay', 'Khuôn mặt không khớp ai trong danh sách lớp bị bỏ ngay tại thiết bị trong lớp: không lưu ảnh, không lưu vector, không tìm trên toàn trường, không cảnh báo "người lạ". Chỉ giữ một con số đếm.'],
-  ['Không bị gán nhầm thành bạn cùng lớp', 'Chỉ gắn danh tính khi khớp 2 trong 3 lần và cách người giống thứ hai đủ xa. Mỗi danh tính chỉ ở một chỗ ngồi, nên một gương mặt lạ không thể làm một bạn vắng mặt thành "có mặt".'],
-  ['Điểm danh bằng QR động trong cùng bảng kết quả', 'Mã đổi mỗi 20 giây, kèm BLE. Kết quả cùng 6 loại kết luận như nhóm Face ID; không bao giờ bị tính vắng chỉ vì không có Face ID.'],
-  ['Kiểm tra ngẫu nhiên giữa giờ cho công bằng', 'Nhóm Face ID được theo dõi cả tiết, nên nhóm QR có một lần quét ngẫu nhiên giữa giờ. Bỏ lỡ thì "Không xác định", GV xác nhận.'],
-  ['Phát hiện người ngoài danh sách mà không định danh ai', 'So số khuôn mặt không khớp với số SV đã quét QR. Dư ra thì báo GV "có thể có người ngoài danh sách", không định danh, không cảnh báo an ninh.'],
-  ['Không gây bất lợi, không gây áp lực', 'Không xếp hạng, không ghi chú tiêu cực, không nhắc đồng ý quá 1 lần mỗi học kỳ. Có thể đồng ý lại hoặc rút đồng ý bất kỳ lúc nào trên App MyDaiNam.'],
-];

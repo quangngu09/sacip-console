@@ -3,7 +3,8 @@ import { FIELD_LABEL, TIME_PRESETS } from '../api/policyValidation';
 import { unitName } from './scope';
 
 export const DAYS = [[1, 'T2'], [2, 'T3'], [3, 'T4'], [4, 'T5'], [5, 'T6'], [6, 'T7'], [7, 'CN']];
-export const RESCAN_CHANNELS = { APP: 'App MyDaiNam', KIOSK: 'Kiosk tại quầy' };
+export const RESCAN_CHANNELS = { APP: 'App MyDaiNam', COUNTER: 'Tại quầy đăng ký' };
+export const channelsText = (list) => list.map((c) => RESCAN_CHANNELS[c] || c).join(', ');
 export const APPROVER_ROLES = {
   ADVISOR: 'GVCN / Cố vấn học tập', REGISTRAR: 'Phòng Đào tạo', UNIT_HEAD: 'Trưởng đơn vị', DORM: 'Ban Quản lý KTX',
   CONTRACT_OWNER: 'Đơn vị quản lý hợp đồng', HCQT: 'Phòng Hành chính - Quản trị', HOST: 'Đơn vị bảo lãnh', DPO: 'Cán bộ bảo vệ dữ liệu',

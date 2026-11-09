@@ -189,28 +189,28 @@ const STU_V12 = withPatch(STU_V11, (c) => { c.biometric.ai_auto_approve_enabled 
 const STF_V11 = {
   scope: { tenant: TENANT, org_units: ['FAC', 'ADM'], subject_types: ['STAFF'] },
   spatial: { zones: ['A100', 'A102', 'C202', 'C301', 'C302'], time_window: { preset: 'OFFICE', days: [1, 2, 3, 4, 5], from: '07:00', to: '17:30' } },
-  biometric: { accepted_sources: ['CARD_DB', 'COUNTER', 'APP'], pose_count: 6, min_quality: 85, ai_auto_approve_enabled: false, ai_auto_approve_threshold: 95, rescan_validity_hours: 72, rescan_max_uses: 1, rescan_channels: ['APP', 'KIOSK'] },
+  biometric: { accepted_sources: ['CARD_DB', 'COUNTER', 'APP'], pose_count: 6, min_quality: 85, ai_auto_approve_enabled: false, ai_auto_approve_threshold: 95, rescan_validity_hours: 72, rescan_max_uses: 1, rescan_channels: ['APP', 'COUNTER'] },
   workflow: { approval_chain: [{ id: 's1', role: 'UNIT_HEAD', label: 'Trưởng đơn vị' }], revoke_two_person: true, retention_days_after_withdraw: 30 },
   triggers: TRIGGERS({ academic: false, contract: false }),
 };
 const CTR_V10 = {
   scope: { tenant: TENANT, org_units: ['OUT'], subject_types: ['CONTRACTOR'] },
   spatial: { zones: ['A100'], time_window: { preset: 'SHIFT', days: [1, 2, 3, 4, 5, 6, 7], from: '05:30', to: '22:00' } },
-  biometric: { accepted_sources: ['COUNTER'], pose_count: 6, min_quality: 88, ai_auto_approve_enabled: false, ai_auto_approve_threshold: 97, rescan_validity_hours: 24, rescan_max_uses: 1, rescan_channels: ['KIOSK'] },
+  biometric: { accepted_sources: ['COUNTER'], pose_count: 6, min_quality: 88, ai_auto_approve_enabled: false, ai_auto_approve_threshold: 97, rescan_validity_hours: 24, rescan_max_uses: 1, rescan_channels: ['COUNTER'] },
   workflow: { approval_chain: [{ id: 's1', role: 'CONTRACT_OWNER', label: 'Đơn vị quản lý hợp đồng' }, { id: 's2', role: 'HCQT', label: 'Phòng Hành chính - Quản trị' }], revoke_two_person: true, retention_days_after_withdraw: 7, contract_notice_days: 30 },
   triggers: TRIGGERS({ academic: false }),
 };
 const RES_V10 = {
   scope: { tenant: TENANT, org_units: ['KTX'], subject_types: ['RESIDENT'] },
   spatial: { zones: ['K400'], time_window: { preset: 'ALWAYS', days: [1, 2, 3, 4, 5, 6, 7], from: '00:00', to: '23:59' } },
-  biometric: { accepted_sources: ['APP', 'CARD_DB', 'COUNTER'], pose_count: 6, min_quality: 85, ai_auto_approve_enabled: true, ai_auto_approve_threshold: 96, rescan_validity_hours: 48, rescan_max_uses: 1, rescan_channels: ['APP', 'KIOSK'] },
+  biometric: { accepted_sources: ['APP', 'CARD_DB', 'COUNTER'], pose_count: 6, min_quality: 85, ai_auto_approve_enabled: true, ai_auto_approve_threshold: 96, rescan_validity_hours: 48, rescan_max_uses: 1, rescan_channels: ['APP', 'COUNTER'] },
   workflow: { approval_chain: [{ id: 's1', role: 'DORM', label: 'Ban Quản lý KTX' }], revoke_two_person: false, retention_days_after_withdraw: 30 },
   triggers: TRIGGERS({ academic: false, contract: false }),
 };
 const GST_V10 = {
   scope: { tenant: TENANT, org_units: ['HTQT'], subject_types: ['GUEST'] },
   spatial: { zones: ['A100'], time_window: { preset: 'CUSTOM', days: [1, 2, 3, 4, 5], from: '07:30', to: '18:00' } },
-  biometric: { accepted_sources: ['COUNTER'], pose_count: 3, min_quality: 80, ai_auto_approve_enabled: false, ai_auto_approve_threshold: 95, rescan_validity_hours: 4, rescan_max_uses: 1, rescan_channels: ['KIOSK'] },
+  biometric: { accepted_sources: ['COUNTER'], pose_count: 3, min_quality: 80, ai_auto_approve_enabled: false, ai_auto_approve_threshold: 95, rescan_validity_hours: 4, rescan_max_uses: 1, rescan_channels: ['COUNTER'] },
   workflow: { approval_chain: [{ id: 's1', role: 'HOST', label: 'Đơn vị bảo lãnh' }], revoke_two_person: false, retention_days_after_withdraw: 1 },
   triggers: TRIGGERS({ academic: false, contract: false }),
 };
@@ -242,12 +242,13 @@ export const POLICIES = [
 
 /** Phiên bản điều khoản đồng ý (Consent Versioning). */
 export const CONSENT_VERSIONS = [
-  { version: 'v1.0', published_at: '01/09/2023', status: 'RETIRED', signed: 3120, summary: 'Điểm danh lớp học, ra vào cổng trường.', purposes: ['Điểm danh lớp học', 'Ra vào cổng trường'], retention: 'Đến khi thôi học' },
+  { version: 'v1.0', published_at: '01/09/2023', status: 'RETIRED', signed: 3424, summary: 'Điểm danh lớp học, ra vào cổng trường.', purposes: ['Điểm danh lớp học', 'Ra vào cổng trường'], retention: 'Đến khi thôi học' },
   { version: 'v1.1', published_at: '15/02/2024', status: 'RETIRED', signed: 610, summary: 'Bổ sung ra vào KTX và phòng thí nghiệm.', purposes: ['Điểm danh lớp học', 'Ra vào cổng trường', 'Ra vào KTX, phòng thí nghiệm'], retention: 'Đến khi thôi học' },
   { version: 'v1.2', published_at: '01/08/2025', status: 'ACTIVE', signed: 19840, summary: 'Bổ sung phát hành thẻ, ghi rõ thời hạn xóa 30 ngày sau khi rút đồng ý và quyền được lãng quên.', purposes: ['Điểm danh lớp học', 'Ra vào cổng, KTX, phòng thí nghiệm', 'Phát hành thẻ sinh viên'], retention: 'Xóa trong 30 ngày sau khi rút đồng ý hoặc thôi học' },
 ];
 
-export const CONSENT_STATS = { total: 24850, active_current: 19840, active_old: 3730, pending: 1150, withdrawn: 130 };
+// Tổng = 21.480 SV + 1.620 cán bộ + 214 nhà thầu + 1.200 cư dân KTX + 336 khách, khớp COVERAGE và nguồn dữ liệu.
+export const CONSENT_STATS = { total: 24850, active_current: 19840, active_old: 4034, pending: 846, withdrawn: 130 };
 
 /** Danh sách đã rút đồng ý để thực hiện quyền được lãng quên. */
 export const ERASURES = [
@@ -279,27 +280,44 @@ export const INTEGRATION_EVENTS = [
 /** Số liệu tổng hợp (máy chủ tính sẵn) cho Tổng quan và Kiểm toán. */
 export const COVERAGE = {
   faculty: [
-    { key: 'CNTT', name: 'Khoa Công nghệ Thông tin', total: 6400, collected: 6170, consent: 6210, children: [['K2022', 1480, 1462, 1470], ['K2023', 1620, 1588, 1601], ['K2024', 1650, 1590, 1612], ['K2025', 1650, 1530, 1527]] },
+    { key: 'CNTT', name: 'Khoa Công nghệ Thông tin', total: 6400, collected: 6170, consent: 6218, children: [['K2022', 1480, 1462, 1470], ['K2023', 1620, 1588, 1601], ['K2024', 1650, 1590, 1612], ['K2025', 1650, 1530, 1535]] },
     { key: 'KT', name: 'Khoa Kinh tế & QTKD', total: 5200, collected: 4910, consent: 5020, children: [['K2022', 1250, 1230, 1238], ['K2023', 1300, 1262, 1281], ['K2024', 1320, 1240, 1270], ['K2025', 1330, 1178, 1231]] },
     { key: 'DDT', name: 'Khoa Điện - Điện tử', total: 3100, collected: 2880, consent: 2955, children: [['K2022', 760, 741, 748], ['K2023', 780, 750, 760], ['K2024', 790, 731, 744], ['K2025', 770, 658, 703]] },
     { key: 'NN', name: 'Khoa Ngoại ngữ', total: 2900, collected: 2540, consent: 2702, children: [['K2022', 700, 672, 690], ['K2023', 720, 668, 690], ['K2024', 740, 640, 676], ['K2025', 740, 560, 646]] },
     { key: 'LUAT', name: 'Khoa Luật', total: 2100, collected: 1980, consent: 2010, children: [['K2022', 510, 500, 502], ['K2023', 520, 500, 503], ['K2024', 530, 501, 505], ['K2025', 540, 479, 500]] },
-    { key: 'VDTQT', name: 'Viện Đào tạo Quốc tế', total: 1830, collected: 1648, consent: 1700, children: [['K2022', 420, 410, 412], ['K2023', 450, 420, 430], ['K2024', 470, 420, 431], ['K2025', 490, 398, 427]] },
+    { key: 'VDTQT', name: 'Viện Đào tạo Quốc tế', total: 1780, collected: 1648, consent: 1700, children: [['K2022', 420, 410, 412], ['K2023', 450, 420, 430], ['K2024', 470, 420, 431], ['K2025', 440, 398, 427]] },
   ],
-  cohort: [['K2022', 5120, 5015, 5060], ['K2023', 5390, 5188, 5265], ['K2024', 5500, 5122, 5238], ['K2025', 5520, 4803, 5034]],
+  cohort: [['K2022', 5120, 5015, 5060], ['K2023', 5390, 5188, 5265], ['K2024', 5500, 5122, 5238], ['K2025', 5470, 4803, 5042]],
   contractor: [['Căng tin (Vending Partner)', 48, 41, 46], ['Bảo vệ (An Phát)', 96, 93, 96], ['Vệ sinh (Sạch Xanh)', 70, 52, 61]],
   dorm: [['KTX Tòa A', 560, 540, 552], ['KTX Tòa B', 640, 590, 620]],
   staff: [['Giảng viên', 980, 950, 962], ['Cán bộ', 640, 598, 612]],
+  guest: [['Khách vãng lai', 336, 310, 320]],
 };
 
-export const BACKLOG = { rescan_open: 37, rescan_oldest_hours: 52, over_sla: 4, new_registration_open: 128, auto_approved_7d: 1402, manual_approved_7d: 386 };
+export const BACKLOG = { auto_approved_7d: 1402, manual_approved_7d: 386 };
 
 /** Cảnh báo lệch chuẩn và nghi gian lận thiết bị. Chỉ dựa trên điều kiện chụp, thiết bị, nhóm đối tượng; không dùng thuộc tính nhân khẩu học. */
 export const ANOMALIES = [
-  { id: 'AN-301', kind: 'BIAS', severity: 'HIGH', title: 'Tỷ lệ lỗi chất lượng ở Kiosk 03 cao gấp 2,4 lần các trạm khác', detail: '38% ảnh bị chói vùng trán trong 7 ngày; nghi đèn trần phản quang.', ref: 'KIOSK_03' },
-  { id: 'AN-298', kind: 'BIAS', severity: 'MEDIUM', title: 'Người đeo kính bị AI chấm thấp hơn trung bình 9 điểm', detail: 'Ảnh hưởng tỷ lệ tự duyệt của nhóm này (61% so với 82%).', ref: 'AI-ENGINE v4.1' },
-  { id: 'AN-295', kind: 'DEVICE_FRAUD', severity: 'HIGH', title: '14 lượt đăng ký từ cùng một điện thoại trong 1 giờ', detail: 'Cùng mã thiết bị App, 14 mã sinh viên khác nhau, 3 lượt không qua kiểm tra người thật.', ref: 'device:a91f…c07' },
-  { id: 'AN-290', kind: 'DEVICE_FRAUD', severity: 'MEDIUM', title: 'Ảnh chụp lại từ màn hình tại cổng A1', detail: '2 lượt phát hiện vân moiré trong 24 giờ.', ref: 'TS_A100_01' },
+  { id: 'AN-301', kind: 'BIAS', severity: 'HIGH', status: 'OPEN', title: 'Tỷ lệ lỗi chất lượng ở Kiosk 03 cao gấp 2,4 lần các trạm khác', detail: '38% ảnh bị chói vùng trán trong 7 ngày; nghi đèn trần phản quang.', ref: 'KIOSK_03' },
+  { id: 'AN-298', kind: 'BIAS', severity: 'MEDIUM', status: 'OPEN', title: 'Người đeo kính bị AI chấm thấp hơn trung bình 9 điểm', detail: 'Ảnh hưởng tỷ lệ tự duyệt của nhóm này (61% so với 82%).', ref: 'AI-ENGINE v4.1' },
+];
+
+/**
+ * Sự cố an ninh cần Trực an ninh xử lý. category: ACCESS = vào sai khu vực, SPOOF = nghi giả mạo / gian lận thiết bị,
+ * DEVICE = thiết bị an ninh gặp sự cố. Việc học vụ (dạy thay, khiếu nại điểm danh) nằm ở ATTENDANCE_CASES.
+ */
+export const INCIDENTS = [
+  { id: 'EV-99121', level: 'critical', category: 'ACCESS', rule: 'R-004B', title: 'Không có quyền vào khu vực hạn chế', place: 'A501 — Phòng Server', cam: 'CAM_A501_01', time: '16:32:08', latency: '1,4 giây', auto: 'Còi + báo an ninh', state: 'open' },
+  { id: 'EV-99117', level: 'critical', category: 'ACCESS', rule: 'R-003', title: 'Trùng danh sách cấm tại cổng', place: 'Cổng chính — Sảnh A', cam: 'CAM_A101_01', time: '15:58:41', latency: '1,8 giây', auto: 'Còi + báo an ninh', state: 'ack' },
+  { id: 'AN-295', level: 'critical', category: 'SPOOF', rule: 'AI-ENGINE', title: '14 lượt đăng ký từ cùng một điện thoại trong 1 giờ', detail: 'Cùng mã thiết bị App, 14 mã sinh viên khác nhau, 3 lượt không qua kiểm tra người thật. Cần khóa tạm các hồ sơ liên quan và xác minh trực tiếp.', place: 'App MyDaiNam', cam: 'device:a91f…c07', time: '14:05:22', latency: '—', auto: 'Giữ 14 hồ sơ ở trạng thái chờ duyệt', state: 'open' },
+  { id: 'AN-290', level: 'warning', category: 'SPOOF', rule: 'AI-ENGINE', title: 'Ảnh chụp lại từ màn hình tại cổng A1', detail: '2 lượt phát hiện vân moiré trong 24 giờ: có người giơ màn hình điện thoại trước cổng xoay.', place: 'Cổng chính Tòa A1', cam: 'TS_A100_01', time: '10:47:10', latency: '0,9 giây', auto: 'Không mở cổng', state: 'open' },
+  { id: 'EV-99090', level: 'warning', category: 'DEVICE', rule: '—', title: 'Camera mất kết nối', place: 'A101 — Sảnh chính', cam: 'CAM_A101_01', time: '08:12:03', latency: '—', auto: 'Ghi nhật ký', state: 'ack' },
+];
+
+/** Ngoại lệ học vụ do Phòng Đào tạo xử lý trong Lịch học & điểm danh. */
+export const ATTENDANCE_CASES = [
+  { id: 'EV-99102', kind: 'SUBSTITUTE', title: 'Dạy thay chưa đăng ký', session: 'C302 • Tiết 4-6 • Mạng máy tính (K17-CNTT-01)', who: 'Giảng viên dạy thay chưa khai báo; GV phụ trách: ThS. Lê Quang Huy', detail: 'Bài giảng vẫn được ghi, giữ lại chờ duyệt. Duyệt ngoại lệ thì video được phát hành bình thường.', time: '09:41:12', status: 'open' },
+  { id: 'EV-99098', kind: 'COMPLAINT', title: 'Khiếu nại điểm danh', session: 'C301 • Tiết 1-3 • Kinh tế vi mô (K66-QTKD-A)', who: 'Lê Minh Khôi (SV-2024-1102)', detail: 'SV khiếu nại bị ghi vắng. Tra cứu cho thấy có mặt 74% thời lượng (dưới mức 80%). Camera không nhận ra vì ảnh hồ sơ chói trán.', time: '09:30:55', status: 'open' },
 ];
 
 export const AUDIT_METRICS = { original_views_7d: 46, original_views_prev_7d: 31, auto_approve_rate: 78.4, bias_alerts_open: 2 };
@@ -315,8 +333,8 @@ export const AUDIT_SEED = [
 ];
 
 export const NOTIFICATIONS = [
-  { id: 1, color: 'status-rejected', title: 'Rút đồng ý Face ID', time: '5 giờ trước', body: 'Hoàng Đỗ Gia Hân (SV-2023-4509) yêu cầu xóa dữ liệu khuôn mặt.', unread: true, to: '/yeu-cau' },
-  { id: 2, color: 'status-pending', title: 'Yêu cầu sắp quá hạn', time: '18 phút trước', body: 'REQ-8839 (Khóa, thu hồi) còn 1 giờ 15 phút để xử lý.', unread: true, to: '/yeu-cau' },
+  { id: 1, color: 'status-rejected', title: 'Rút đồng ý Face ID', time: '5 giờ trước', body: 'Hoàng Đỗ Gia Hân (SV-2023-4509) yêu cầu xóa dữ liệu khuôn mặt.', unread: true, to: '/yeu-cau?id=REQ-8836' },
+  { id: 2, color: 'status-pending', title: 'Yêu cầu sắp quá hạn', time: '18 phút trước', body: 'REQ-8839 (Khóa, thu hồi) còn 1 giờ 15 phút để xử lý.', unread: true, to: '/yeu-cau?id=REQ-8839' },
   { id: 3, color: 'status-rejected', title: 'Mất kết nối Hệ thống Chấm công', time: '26 giờ trước', body: 'Chính sách dùng ca làm việc đang lấy dữ liệu cũ.', unread: true, to: '/tich-hop' },
   { id: 4, color: 'status-rejected', title: 'Cảnh báo an ninh: khu vực hạn chế', time: '25 phút trước', body: 'Đối tượng lạ xuất hiện tại Phòng Server tầng 5 nhà A.', unread: true, alert: true, to: '/soc' },
 ];

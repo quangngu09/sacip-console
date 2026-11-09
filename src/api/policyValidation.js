@@ -67,6 +67,7 @@ export function validatePolicy(c) {
   if (!(b.rescan_max_uses >= 1 && b.rescan_max_uses <= 5)) e['biometric.rescan_max_uses'] = 'Số lần chụp lại phải từ 1 đến 5.';
   if (!b.rescan_channels.length) e['biometric.rescan_channels'] = 'Chọn ít nhất một nơi được chụp lại.';
   else if (b.rescan_channels.includes('APP') && !b.accepted_sources.includes('APP')) e['biometric.rescan_channels'] = 'Muốn cho chụp lại trên App thì phải chấp nhận nguồn App MyDaiNam.';
+  else if (b.rescan_channels.includes('COUNTER') && !b.accepted_sources.includes('COUNTER')) e['biometric.rescan_channels'] = 'Muốn cho chụp lại tại quầy thì phải chấp nhận nguồn Đăng ký tại quầy.';
 
   // Bước 4
   const chain = c.workflow.approval_chain;

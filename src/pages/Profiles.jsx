@@ -1,12 +1,13 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { AiCard, Banner, Chip, ConfirmReason, DataBoundary, Drawer, Empty, FaceThumb, Icon, PageHeader, ScoreBar, SearchInput, Select, SortTh, SourceBadge, StateBadge, StatusDot, SubjectTypeChip, Tabs, useCountdown, useSort } from '../components/ui';
 import { useApp } from '../store';
-import { bulkAction, clearRisk, createRequest, flagRisk, policyFor, requestOriginalImage, setValidity } from '../api/client';
+import { bulkAction, clearRisk, confirmConsentOnApp, createRequest, flagRisk, policyFor, requestOriginalImage, requestReconsent, setValidity } from '../api/client';
 import { DOCUMENT_STATUS, LIVE_PROFILES, NO_DATA, SUBJECT_TYPE_OF, documentStatusMeta, lastFaceDocuments, searchFaceDocuments } from '../api/faceDocuments';
 import { REQUEST_STATUS, REQUEST_TYPE, SOURCE, STATE, SUBJECT_TYPE, consentLabel, stateMeta } from '../api/enums';
 import { fmtDateTime, fmtNumber, fmtRelative } from '../lib/format';
 import { unitName } from '../lib/scope';
+import { channelsText } from '../lib/policyText';
 
 /** Dòng ngữ cảnh thay đổi theo loại đối tượng (Đặc tả IAM §2.2: sinh viên có khoa/lớp, nhà thầu có hợp đồng). */
 export const contextLine = (s) => {
@@ -58,11 +59,14 @@ export default function Profiles() {
   const [live, setLive] = useState(lastFaceDocuments);
   const loadLive = useCallback(async () => setLive(await searchFaceDocuments()), []);
   const subjects = LIVE_PROFILES ? live.rows : data.subjects;
-  const [view, setView] = useState('all');
+  // ?nhom=not_collected mở sẵn một nhóm, ?id=sub_… mở sẵn chi tiết (liên kết từ Tổng quan, Đồng ý).
+  const [params, setParams] = useSearchParams();
+  const [view, setView] = useState(() => (ACTIVE_VIEWS.some((v) => v.key === params.get('nhom')) ? params.get('nhom') : 'all'));
   const [q, setQ] = useState('');
   const [filters, setFilters] = useState(NO_FILTERS);
   const [selected, setSelected] = useState(new Set());
-  const [detailId, setDetailId] = useState(null);
+  const detailId = params.get('id');
+  const setDetailId = (id) => setParams((p) => { const n = new URLSearchParams(p); if (id) n.set('id', id); else n.delete('id'); return n; });
   const [bulk, setBulk] = useState(null);
 
   const rows = useMemo(() => {
@@ -91,7 +95,7 @@ export default function Profiles() {
   const runBulk = async (reason) => {
     try {
       const r = await call(bulkAction, [...selected], bulk.key, reason);
-      if (r.done.length) toast(bulk.label, `Đã áp dụng cho ${r.done.length} hồ sơ và ghi nhật ký kiểm toán.`, 'success');
+      if (r.done.length) toast(bulk.label, `Đã áp dụng cho ${r.done.length} hồ sơ và ghi nhật ký truy vết.`, 'success');
       if (r.skipped.length) toast(`Bỏ qua ${r.skipped.length} hồ sơ`, r.skipped.map((x) => `${x.code}: ${x.why}`).join(' • '), 'warn');
     } catch (e) { toast('Không thực hiện được', e.message, 'error'); }
     setBulk(null);
@@ -195,7 +199,7 @@ export default function Profiles() {
               </>
             ) : (
               <>
-                <span aria-live="polite">Hiển thị <b className="text-text-primary font-medium">{rows.length}</b> / {subjects.length} hồ sơ mẫu <span className="text-caption">(toàn hệ thống {fmtNumber(24850)})</span></span>
+                <span aria-live="polite">Hiển thị <b className="text-text-primary font-medium">{rows.length}</b> / {subjects.length} hồ sơ mẫu <span className="text-caption">(toàn hệ thống {fmtNumber(data.consentStats.total)})</span></span>
                 <span className="text-caption">Dữ liệu giả lập qua src/api/client.js</span>
               </>
             )}
@@ -213,6 +217,14 @@ export default function Profiles() {
   );
 }
 
+/** Gửi điều khoản tới App, kèm nút mô phỏng người dùng bấm đồng ý (trên thực tế việc này chỉ xảy ra ở App). */
+const ConsentActions = ({ onAsk, onSimulate }) => (
+  <div className="flex gap-1.5 flex-wrap">
+    <button className="btn-outline btn-sm" onClick={onAsk}>Gửi yêu cầu xác nhận</button>
+    <button className="btn btn-sm text-text-secondary hover:bg-surface-container-low" title="Mô phỏng người dùng đồng ý trên App" onClick={onSimulate}><Icon name="smartphone" size={16} />Mô phỏng đồng ý trên App</button>
+  </div>
+);
+
 const StateGrid = ({ s }) => (
   <dl className="grid grid-cols-5 gap-1.5">
     {Object.keys(STATE).map((dim) => {
@@ -229,7 +241,7 @@ const StateGrid = ({ s }) => (
 );
 
 function ProfileDrawer({ s, onClose }) {
-  const { data, call, toast, can, log } = useApp();
+  const { data, call, toast, can } = useApp();
   const [ask, setAsk] = useState(null);
   const [riskLevel, setRiskLevel] = useState('WATCH');
   const [signed, setSigned] = useState(null);
@@ -238,9 +250,15 @@ function ProfileDrawer({ s, onClose }) {
   const pol = s.readonly ? null : policyFor(s.subject_type);
   const consentOk = s.states.consent === 'ACTIVE';
   const history = data.requests.filter((r) => r.subject_id === s.subject_id);
+  const pendingReg = history.find((r) => r.status === 'pending' && r.request_type === 'NEW_REGISTRATION');
+  const oldTerms = consentOk && s.consent_version !== 'v1.2';
   const locked = ['LOCKED', 'REVOKED'].includes(s.states.validity);
   const writable = can('profile_write');
   const scoreColor = (x) => (x >= 85 ? 'text-status-active' : x >= 70 ? 'text-status-pending' : 'text-status-rejected');
+
+  const simulateConsent = async () => {
+    try { await call(confirmConsentOnApp, s.subject_id); toast('Người dùng đã đồng ý điều khoản v1.2', `${s.name} xác nhận trên App MyDaiNam.`, 'success'); } catch (e) { toast('Không thực hiện được', e.message, 'error'); }
+  };
 
   const act = async (kind, reason) => {
     try {
@@ -253,7 +271,7 @@ function ProfileDrawer({ s, onClose }) {
       if (kind === 'rescan') { const r = await call(createRequest, s.subject_id, 'RESCAN', reason); toast('Đã tạo yêu cầu chụp lại', `${r.request_id} đã vào Hộp yêu cầu.`, 'success'); }
       if (kind === 'flag') { const r = await call(flagRisk, s.subject_id, riskLevel, reason); toast('Đã gắn cờ rủi ro', r.event ? `Đã báo trực an ninh qua ${r.event.transport === 'RABBITMQ' ? 'RabbitMQ' : r.event.transport} (${r.event.event_id}).` : 'Sự kiện báo rủi ro đang tắt trong chính sách.', 'warn'); }
       if (kind === 'unflag') { await call(clearRisk, s.subject_id, reason); toast('Đã gỡ cờ rủi ro', s.code, 'success'); }
-      if (kind === 'reconsent') { log(`Gửi yêu cầu xác nhận điều khoản v1.2 — ${reason}`, s.code, 'CONSENT_RECONFIRM_REQUESTED'); toast('Đã gửi yêu cầu xác nhận', `${s.name} sẽ nhận thông báo trên App MyDaiNam.`, 'success'); }
+      if (kind === 'reconsent') { await call(requestReconsent, null, s.subject_id); toast('Đã gửi yêu cầu xác nhận', `${s.name} sẽ nhận thông báo trên App MyDaiNam.`, 'success'); }
     } catch (e) { toast('Không thực hiện được', e.message, 'error'); }
     setAsk(null);
   };
@@ -276,11 +294,11 @@ function ProfileDrawer({ s, onClose }) {
         {s.readonly && <Banner icon="visibility">Hồ sơ đọc từ API thật, chỉ xem. Các thao tác duyệt, khóa, thu hồi chưa được nối API.</Banner>}
         {!consentOk && !s.readonly && (
           <Banner tone="danger" icon="lock" title="Chưa có xác nhận đồng ý hợp lệ."
-            action={s.states.consent === 'PENDING' && writable && <button className="btn-outline btn-sm" onClick={() => setAsk('reconsent')}>Gửi yêu cầu xác nhận</button>}>
+            action={s.states.consent === 'PENDING' && can('consent') && <ConsentActions onAsk={() => setAsk('reconsent')} onSimulate={simulateConsent} />}>
             Mọi thao tác sinh trắc (xem ảnh, chụp lại, kích hoạt) bị khóa cho đến khi {s.name} xác nhận điều khoản v1.2.
           </Banner>
         )}
-        {consentOk && s.consent_version !== 'v1.2' && <Banner tone="warn">Đang đồng ý theo điều khoản cũ {s.consent_version}. Mục đích mới (phát hành thẻ) chưa được phép cho đến khi xác nhận v1.2.</Banner>}
+        {oldTerms && <Banner tone="warn" action={can('consent') && <ConsentActions onAsk={() => setAsk('reconsent')} onSimulate={simulateConsent} />}>Đang đồng ý theo điều khoản cũ {s.consent_version}. Mục đích mới (phát hành thẻ) chưa được phép cho đến khi xác nhận v1.2.</Banner>}
         {s.ai_hint && <AiCard><p className="text-body-sm">{s.ai_hint}</p></AiCard>}
 
         <section>
@@ -324,8 +342,8 @@ function ProfileDrawer({ s, onClose }) {
           )}
         </section>
 
-        {s.rescan_grant && s.states.request === 'RESCAN_GRANTED' && (
-          <Banner icon="replay" title="Đang được phép chụp lại.">Qua {s.rescan_grant.channels.map((c) => (c === 'APP' ? 'App MyDaiNam' : 'Kiosk')).join(', ')}, còn {s.rescan_grant.uses_left} lần, hết hạn {fmtDateTime(s.rescan_grant.expires_at)} ({fmtRelative(s.rescan_grant.expires_at)}).</Banner>
+        {s.rescan_grant && new Date(s.rescan_grant.expires_at) > new Date() && (
+          <Banner icon="replay" title="Đang được phép chụp lại.">Qua {channelsText(s.rescan_grant.channels)}, còn {s.rescan_grant.uses_left} lần, hết hạn {fmtDateTime(s.rescan_grant.expires_at)} ({fmtRelative(s.rescan_grant.expires_at)}).</Banner>
         )}
 
         {s.readonly && (
@@ -378,7 +396,9 @@ function ProfileDrawer({ s, onClose }) {
           {locked
             ? <button className="btn-outline" disabled={!writable || !consentOk || s.states.validity === 'REVOKED'} onClick={() => setAsk('unlock')}><Icon name="lock_open" size={16} />Mở khóa</button>
             : <button className="btn-outline" disabled={!can('lock')} onClick={() => setAsk('lock')}><Icon name="lock" size={16} />Khóa</button>}
-          {s.states.validity === 'PENDING_ACTIVATION' && <button className="btn-outline" disabled={!writable || !consentOk} onClick={() => setAsk('activate')}><Icon name="check_circle" size={16} />Kích hoạt</button>}
+          {s.states.validity === 'PENDING_ACTIVATION' && (pendingReg
+            ? <Link className="btn-outline" to={`/yeu-cau?id=${pendingReg.request_id}`} title="Kích hoạt khi yêu cầu đăng ký được duyệt đủ các bước"><Icon name="move_to_inbox" size={16} />Duyệt {pendingReg.request_id}</Link>
+            : <button className="btn-outline" disabled={!writable || !consentOk} onClick={() => setAsk('activate')}><Icon name="check_circle" size={16} />Kích hoạt</button>)}
           <button className="btn-danger" disabled={!writable || s.states.validity === 'REVOKED'} onClick={() => setAsk('revoke')}><Icon name="cancel" size={16} />Thu hồi</button>
           <button className="btn-primary flex-1" disabled={!writable || !consentOk} onClick={() => setAsk('rescan')}><Icon name="add_task" size={16} />Tạo yêu cầu chụp lại</button>
         </div>
@@ -398,7 +418,7 @@ function ProfileDrawer({ s, onClose }) {
           </>
         )}
         {ask === 'revoke' && <Banner tone="danger">{pol.config.workflow.revoke_two_person ? 'Thu hồi cần 2 cán bộ khác nhau xác nhận.' : 'Thu hồi cần người duyệt xác nhận.'} Yêu cầu sẽ chuyển sang Hộp yêu cầu.</Banner>}
-        {ask === 'rescan' && <Banner>Khi được duyệt, {s.name} được chụp lại qua {pol.config.biometric.rescan_channels.map((c) => (c === 'APP' ? 'App MyDaiNam' : 'Kiosk')).join(', ')} trong {pol.config.biometric.rescan_validity_hours} giờ, {pol.config.biometric.rescan_max_uses} lần.</Banner>}
+        {ask === 'rescan' && <Banner>Khi được duyệt, {s.name} được chụp lại qua {channelsText(pol.config.biometric.rescan_channels)} trong {pol.config.biometric.rescan_validity_hours} giờ, {pol.config.biometric.rescan_max_uses} lần.</Banner>}
       </ConfirmReason>
     </Drawer>
   );

@@ -356,7 +356,7 @@ function Step3({ cfg, update, err }) {
           </div>
           <span className="text-label-md mt-1">Nơi được chụp lại</span>
           <ChipToggleGroup label="Nơi được chụp lại" invalid={!!err('biometric.rescan_channels')} value={b.rescan_channels} onChange={update('biometric.rescan_channels')}
-            options={Object.entries(RESCAN_CHANNELS).map(([value, label]) => ({ value, label, icon: value === 'APP' ? 'smartphone' : 'photo_camera_front' }))} />
+            options={Object.entries(RESCAN_CHANNELS).map(([value, label]) => ({ value, label, icon: value === 'APP' ? 'smartphone' : 'storefront' }))} />
           <FieldError msg={err('biometric.rescan_channels')} />
         </Section>
       </div>
@@ -486,7 +486,7 @@ function Step5({ cfg, policy, changes, errors, reason, setReason, dry, runDry, b
         <ul className="text-body-sm flex flex-col gap-1.5">
           <li className="flex gap-2"><Icon name="check" size={16} className="text-status-active mt-0.5" />Có hiệu lực ngay, không cần triển khai lại.</li>
           <li className="flex gap-2"><Icon name="check" size={16} className="text-status-active mt-0.5" />{policy.current_version} được giữ để khôi phục khi cần.</li>
-          <li className="flex gap-2"><Icon name="check" size={16} className="text-status-active mt-0.5" />Người sửa và lý do được ghi vào nhật ký kiểm toán.</li>
+          <li className="flex gap-2"><Icon name="check" size={16} className="text-status-active mt-0.5" />Người sửa và lý do được ghi vào nhật ký truy vết.</li>
         </ul>
         <label className="flex flex-col gap-1.5">
           <span className="text-label-md font-semibold">Lý do thay đổi <span className="text-status-rejected">*</span></span>

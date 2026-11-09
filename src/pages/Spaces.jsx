@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Banner, DataBoundary, Icon, Chip, Empty, FieldError, Modal, PageHeader, ConfirmReason, SearchInput, Select, StatusDot, Tabs } from '../components/ui';
+import { Banner, DataBoundary, Icon, Chip, Empty, FieldError, Modal, PageHeader, ConfirmReason, SearchInput, Select, StatusDot, Switch, Tabs } from '../components/ui';
 import AccessGrants from './AccessGrants';
 import { ROOM_SURVEY } from '../data/attendance';
+import { MOVEMENT_ZONES } from '../data/movement';
 import { useApp } from '../store';
 import { approveRoom, assignDevice, createRoom, setRoomZone, suggestRoomCode } from '../api/client';
 import { DEVICES } from '../data/mock';
@@ -23,6 +24,7 @@ export default function Spaces() {
   const [zoneAsk, setZoneAsk] = useState(null);
   const [params, setParams] = useSearchParams();
   const tab = params.get('tab') || 'tree';
+  const [moveLog, setMoveLog] = useState(() => Object.fromEntries(Object.entries(MOVEMENT_ZONES).map(([k, v]) => [k, v.log])));
   const rooms = flatRooms(tree);
   const room = rooms.find((r) => r.id === sel);
   const free = DEVICES.filter((d) => !d.room || !rooms.some((r) => r.devices.includes(d.id)));
@@ -104,6 +106,22 @@ export default function Spaces() {
                 </label>
                 <p className="text-caption text-text-secondary pb-1">Hạn chế và Cấm: cảnh báo người lạ / không có quyền trong 2 giây. Công cộng và Vận hành: không cảnh báo khi người không có quyền xuất hiện.</p>
               </div>
+
+              {MOVEMENT_ZONES[room.id] && (() => {
+                const z = MOVEMENT_ZONES[room.id];
+                const locked = !z.cam || /riêng tư/.test(z.note);
+                return (
+                  <div className="p-3 rounded-lg border border-border-subtle flex items-start gap-3">
+                    <Icon name="route" size={20} className="text-primary-container mt-0.5" />
+                    <div className="flex-1">
+                      <div className="text-label-md font-semibold">Ghi lượt ra vào khi qua zone này (R-013)</div>
+                      <p className="text-caption text-text-secondary">{z.note}{z.cam ? ` • thiết bị ${z.cam}` : ''}{z.down ? ' • camera đang mất kết nối' : ''}</p>
+                    </div>
+                    <Switch checked={!!moveLog[room.id]} disabled={locked || !can('space_write')} label={`Ghi lượt ra vào tại ${room.id}`}
+                      onChange={(v) => { setMoveLog((m) => ({ ...m, [room.id]: v })); log(`${v ? 'Bật' : 'Tắt'} ghi lượt ra vào tại ${room.id}`, room.id); toast(v ? 'Đã bật ghi lượt ra vào' : 'Đã tắt ghi lượt ra vào', room.id, 'success'); }} />
+                  </div>
+                );
+              })()}
 
               {ROOM_SURVEY[room.id] && (() => {
                 const v = ROOM_SURVEY[room.id];

@@ -67,6 +67,7 @@ export const RULES = [
   { id: 'R-010', policies: 'NONE', name: 'Khuôn mặt không khớp danh sách lớp', group: 'Người không có Face ID hoặc không thuộc lớp', space: 'Phòng của tiết học', time: 'Theo lịch học', action: 'Loại bỏ ngay tại thiết bị, chỉ đếm số lượng; dư so với số SV quét QR thì báo GV "có thể có người ngoài danh sách"', type: 'audit', purpose: 'P-ATT-START', alert: null, mode: 'active', hits: 2310 },
   { id: 'R-011', policies: ['POL-RES'], name: 'Ra vào KTX trong giờ giới nghiêm', group: 'Cư dân KTX', space: 'Cửa từ KTX Tòa B', time: '23:00–05:00', action: 'Vẫn mở cửa cho cư dân; ghi nhận và gửi bản tổng hợp sáng hôm sau cho Ban Quản lý KTX', type: 'audit', purpose: 'P-ACCESS', alert: 'AP-DORM', mode: 'active', hits: 46 },
   { id: 'R-012', policies: ['POL-CTR'], name: 'Nhà thầu ngoài ca trực hoặc hết hạn hợp đồng', group: 'Nhân viên nhà thầu', space: 'Cổng & khu được cấp quyền', time: 'Ngoài ca trực (Chấm công)', action: 'Không mở cửa; báo bảo vệ zone và đơn vị quản lý hợp đồng', type: 'realtime', purpose: 'P-ACCESS', alert: 'AP-SEC-WARN', mode: 'active', hits: 5, needs: 'Chấm công đang mất đồng bộ 26 giờ: tạm dùng ca làm việc cũ' },
+  { id: 'R-013', policies: 'ALL', name: 'Ghi lượt ra vào các zone', group: 'Mọi người đã có Face ID; người khác ghi "không định danh"', space: 'Mọi zone bật "Ghi lượt ra vào"', time: '24/7', action: 'Ghi 1 dòng mỗi lần vào / ra zone: người, zone, hướng, thời điểm, thiết bị, độ tin cậy. Không lưu ảnh, không cảnh báo', type: 'audit', purpose: 'P-MOVE', alert: null, mode: 'shadow', hits: 1412100, needs: 'Chạy bóng: chỉ lưu số đếm ẩn danh cho đến khi có điều khoản v1.3 và DPIA' },
 ];
 
 export const SCHEDULE = [
@@ -74,14 +75,6 @@ export const SCHEDULE = [
   { slot: 'Tiết 1-3 (07:00–09:25)', room: 'C301', course: 'Kinh tế vi mô', lecturer: 'TS. Trần Thị Thu Thảo', cls: 'K66-QTKD-A', present: 47, late: 6, midAbsent: 0, absent: 2, leave: 0, unknown: 3, alt: 3, stage: 'final', recording: 'done' },
   { slot: 'Tiết 4-6 (09:35–12:00)', room: 'C302', course: 'Mạng máy tính', lecturer: 'ThS. Lê Quang Huy', cls: 'K17-CNTT-01', present: 41, late: 2, midAbsent: 0, absent: 7, leave: 2, unknown: 0, alt: 2, stage: 'live', recording: 'held', substitute: true },
   { slot: 'Tiết 4-6 (09:35–12:00)', room: 'C305', course: 'Thực hành Java', lecturer: 'ThS. Đỗ Minh Tâm', cls: 'K18-CNTT-03', present: 0, late: 0, midAbsent: 0, absent: 0, leave: 0, unknown: 0, alt: 0, stage: 'manual', recording: 'blocked', blocked: true },
-];
-
-export const SOC_EVENTS = [
-  { id: 'EV-99121', level: 'critical', rule: 'R-004B', title: 'Không có quyền vào khu vực hạn chế', place: 'A501 — Phòng Server', cam: 'CAM_A501_01', time: '16:32:08', latency: '1,4 giây', state: 'open' },
-  { id: 'EV-99117', level: 'critical', title: 'Trùng danh sách cấm tại cổng', place: 'Cổng chính — Sảnh A', cam: 'CAM_A101_01', time: '15:58:41', latency: '1,8 giây', state: 'ack' },
-  { id: 'EV-99102', level: 'warning', title: 'Dạy thay chưa xin phép', place: 'C302 — Tiết 4-6', cam: 'CAM_C302_01', time: '09:41:12', latency: '—', state: 'open' },
-  { id: 'EV-99098', level: 'info', title: 'Khiếu nại điểm danh', place: 'C301 — SV-2024-1102', cam: 'CAM_C301_01', time: '09:30:55', latency: '—', state: 'open' },
-  { id: 'EV-99090', level: 'warning', title: 'Camera mất kết nối', place: 'A101 — Sảnh chính', cam: 'CAM_A101_01', time: '08:12:03', latency: '—', state: 'ack' },
 ];
 
 export const RECORDING_META = {

@@ -5,13 +5,15 @@ import ClassSessionDrawer from '../components/ClassSessionDrawer';
 import { useApp } from '../store';
 import { RECORDING_META as rec, SCHEDULE } from '../data/mock';
 import { AT_RISK, ATTENDANCE_PARAMS, BREAKS, PRESENCE_BY_UNIT, TEACHING_EXCEPTIONS } from '../data/attendance';
-import { fmtNumber } from '../lib/format';
+import { fmtDateTime, fmtNumber } from '../lib/format';
+import { decideAttendanceCase } from '../api/client';
 import { useScope } from '../lib/scope';
 
 const SORTERS = { slot: (s) => s.slot, room: (s) => s.room, course: (s) => s.course, lecturer: (s) => s.lecturer, present: (s) => s.present, late: (s) => s.late, midAbsent: (s) => s.midAbsent, absent: (s) => s.absent, unknown: (s) => s.unknown };
 const SAMPLE_DATE = '2025-10-24';
 const VIEWS = [
   { key: 'schedule', label: 'Lịch học' },
+  { key: 'cases', label: 'Ngoại lệ & khiếu nại' },
   { key: 'report', label: 'Báo cáo hiện diện' },
   { key: 'params', label: 'Tham số điểm danh' },
   { key: 'attendance', label: 'Luồng điểm danh' },
@@ -43,9 +45,10 @@ const MEDIA_STEPS = [
 ];
 
 export default function Schedule() {
-  const { toast, log } = useApp();
+  const { toast, log, data } = useApp();
   const [params, setParams] = useSearchParams();
   const view = params.get('view') || 'schedule';
+  const openCases = data.attendanceCases.filter((c) => c.status === 'open').length;
   return (
     <div>
       <PageHeader title="Lịch học & điểm danh" desc="Lịch lấy từ hệ thống đào tạo, chỉ đọc. Kết luận điểm danh theo từng tiết, GV xác nhận sau buổi, rồi mới đẩy về Hệ thống Đào tạo."
@@ -54,8 +57,9 @@ export default function Schedule() {
 
       <DataBoundary name="schedule" label="lịch học" scopeNote="units">
       <div className="card overflow-hidden">
-        <Tabs label="Nội dung" className="px-2 border-b border-border-subtle" value={view} onChange={(v) => setParams(v === 'schedule' ? {} : { view: v })} items={VIEWS} />
+        <Tabs label="Nội dung" className="px-2 border-b border-border-subtle" value={view} onChange={(v) => setParams(v === 'schedule' ? {} : { view: v })} items={VIEWS.map((v) => (v.key === 'cases' ? { ...v, count: openCases || undefined } : v))} />
         {view === 'schedule' && <ScheduleView />}
+        {view === 'cases' && <CasesView />}
         {view === 'report' && <ReportView />}
         {view === 'params' && <ParamsView />}
         {view === 'attendance' && (
@@ -120,7 +124,7 @@ function ScheduleView() {
                 <td className="whitespace-nowrap">{s.slot}</td>
                 <td className="font-mono font-medium">{s.room}</td>
                 <td><div className="font-medium">{s.course}</div><div className="text-caption font-mono text-text-secondary">{s.cls}</div></td>
-                <td><div className="whitespace-nowrap">{s.lecturer}</div>{s.substitute && <Chip color="status-pending" icon="swap_horiz">Dạy thay, chưa đăng ký</Chip>}</td>
+                <td><div className="whitespace-nowrap">{s.lecturer}</div>{s.substitute && <Link to="/thoi-khoa-bieu?view=cases"><Chip color="status-pending" icon="swap_horiz">Dạy thay, chưa đăng ký</Chip></Link>}</td>
                 <td className="tabular-nums">{s.present}</td>
                 <td className="tabular-nums">{s.late}</td>
                 <td className="tabular-nums">{s.midAbsent || '—'}</td>
@@ -141,6 +145,57 @@ function ScheduleView() {
       </div>
       {open && <ClassSessionDrawer row={open} onClose={() => setOpen(null)} />}
     </>
+  );
+}
+
+const CASE_KIND = {
+  SUBSTITUTE: { icon: 'swap_horiz', accept: 'Duyệt ngoại lệ', reject: 'Không duyệt', acceptNote: 'Video bài giảng được phát hành.', rejectNote: 'Video tiếp tục bị giữ; báo Trưởng khoa.' },
+  COMPLAINT: { icon: 'rate_review', accept: 'Chấp nhận khiếu nại', reject: 'Giữ nguyên kết quả', acceptNote: 'Sửa kết quả tiết thành Có mặt và báo SV.', rejectNote: 'Giữ kết quả, gửi lý do về App cho SV.' },
+};
+const CASE_STATUS = { open: ['status-pending', 'Chờ xử lý'], accepted: ['status-active', 'Đã chấp nhận'], rejected: ['status-inactive', 'Không chấp nhận'] };
+
+/** Ngoại lệ học vụ: dạy thay chưa đăng ký và khiếu nại điểm danh. Phòng Đào tạo xử lý, không phải trực an ninh. */
+function CasesView() {
+  const { data, call, toast, actor } = useApp();
+  const [ask, setAsk] = useState(null);
+  const canDecide = ['REGISTRAR', 'ADMIN'].includes(actor.role);
+  const decide = async (note) => {
+    try { await call(decideAttendanceCase, ask.c.id, ask.accept, note); toast(ask.accept ? CASE_KIND[ask.c.kind].accept : CASE_KIND[ask.c.kind].reject, ask.c.id, 'success'); } catch (e) { toast('Không thực hiện được', e.message, 'error'); }
+    setAsk(null);
+  };
+  return (
+    <div className="p-space-md flex flex-col gap-space-sm">
+      <p className="text-caption text-text-secondary">Phòng Đào tạo xử lý. Mỗi quyết định phải có căn cứ và được ghi vào Nhật ký truy vết.</p>
+      {data.attendanceCases.length === 0 && <Empty title="Không có ngoại lệ" />}
+      <ul className="flex flex-col gap-space-sm">
+        {data.attendanceCases.map((c) => {
+          const k = CASE_KIND[c.kind];
+          return (
+            <li key={c.id} className="card p-space-md flex flex-col gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Icon name={k.icon} className="text-primary-container" />
+                <h3 className="text-label-md font-semibold">{c.title}</h3>
+                <span className="font-mono text-caption text-text-secondary">{c.id} • {c.time}</span>
+                <Chip color={CASE_STATUS[c.status][0]} className="ml-auto">{CASE_STATUS[c.status][1]}</Chip>
+              </div>
+              <div className="text-body-sm"><b>{c.session}</b><div className="text-text-secondary">{c.who}</div></div>
+              <p className="text-body-sm">{c.detail}</p>
+              {c.status === 'open' ? (
+                <div className="flex items-center gap-2">
+                  <button className="btn-primary btn-sm" disabled={!canDecide} onClick={() => setAsk({ c, accept: true })}><Icon name="check" size={16} />{k.accept}</button>
+                  <button className="btn-outline btn-sm" disabled={!canDecide} onClick={() => setAsk({ c, accept: false })}>{k.reject}</button>
+                  {!canDecide && <span className="text-caption text-text-secondary">Chỉ Phòng Đào tạo xử lý.</span>}
+                </div>
+              ) : <p className="text-caption text-text-secondary">{c.decided_by}, {fmtDateTime(c.decided_at)} — {c.note}</p>}
+            </li>
+          );
+        })}
+      </ul>
+      <ConfirmReason open={!!ask} onClose={() => setAsk(null)} onConfirm={decide} danger={ask && !ask.accept}
+        title={ask && (ask.accept ? CASE_KIND[ask.c.kind].accept : CASE_KIND[ask.c.kind].reject)} subtitle={ask && `${ask.c.id} • ${ask.c.session}`} reasonLabel="Căn cứ quyết định">
+        {ask && <Banner>{ask.accept ? CASE_KIND[ask.c.kind].acceptNote : CASE_KIND[ask.c.kind].rejectNote}</Banner>}
+      </ConfirmReason>
+    </div>
   );
 }
 

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Bone, Chip, DataBoundary, Icon, MetricsSkeleton, MetricStrip, PageHeader, Tabs } from '../components/ui';
 import { useApp } from '../store';
 import { REQUEST_TYPE } from '../api/enums';
-import { SOC_EVENTS, DEVICES } from '../data/mock';
+import { DEVICES } from '../data/mock';
 import { fmtNumber, fmtPercent, fmtRelative, slaState } from '../lib/format';
 import { useScope } from '../lib/scope';
 
@@ -16,17 +16,20 @@ function AttentionList({ items }) {
   if (!items.length) return <p className="px-space-md py-6 text-body-sm text-text-secondary border-t border-border-subtle">Không có việc cần xử lý.</p>;
   return (
     <div className="flex flex-col divide-y divide-border-subtle border-t border-border-subtle">
-      {items.map((it) => (
-        <Link key={it.key} to={it.to} className="grid grid-cols-[116px_1fr_auto_16px] items-center gap-3 min-h-[60px] px-space-md py-2.5 hover:bg-surface-container-low -outline-offset-2">
+      {items.map((it) => {
+        const Row = it.to ? Link : 'div';
+        return (
+        <Row key={it.key} to={it.to} className={`grid grid-cols-[116px_1fr_auto_16px] items-center gap-3 min-h-[60px] px-space-md py-2.5 ${it.to ? 'hover:bg-surface-container-low' : ''} -outline-offset-2`}>
           <span className={`flex items-center gap-1.5 text-label-sm ${LEVEL[it.level].color}`}><Icon name={LEVEL[it.level].icon} size={16} />{LEVEL[it.level].label}</span>
           <span className="min-w-0">
             <span className="block text-label-md font-semibold truncate">{it.title}</span>
             <span className="block text-caption text-text-secondary truncate">{it.meta}</span>
           </span>
           <span className="text-caption text-text-secondary whitespace-nowrap">{it.when}</span>
-          <Icon name="chevron_right" size={16} className="text-status-inactive" />
-        </Link>
-      ))}
+          {it.to ? <Icon name="chevron_right" size={16} className="text-status-inactive" /> : <span />}
+        </Row>
+        );
+      })}
     </div>
   );
 }
@@ -49,6 +52,7 @@ const DIMENSIONS = [
   { key: 'staff', label: 'Cán bộ, giảng viên' },
   { key: 'contractor', label: 'Đơn vị thuê ngoài' },
   { key: 'dorm', label: 'KTX' },
+  { key: 'guest', label: 'Khách' },
 ];
 
 const toRows = (coverage, dim) => (dim === 'faculty'
@@ -69,7 +73,7 @@ function Coverage({ coverage, dim, setDim }) {
       <div className="flex items-center justify-between px-space-md pt-3">
         <div>
           <h2 className="text-headline-md">Tỷ lệ phủ Face ID và đồng ý</h2>
-          <p className="text-caption text-text-secondary">Sắp xếp từ thấp đến cao để thấy điểm nghẽn trước. Dưới 90% tô vàng. Bấm một khoa để xem theo khóa.</p>
+          <p className="text-caption text-text-secondary">Sắp xếp từ thấp đến cao để thấy điểm nghẽn trước. Dưới 90% tô vàng. Bấm một khoa để xem theo khóa. "Đã xác nhận đồng ý" tính mọi phiên bản điều khoản còn hiệu lực.</p>
         </div>
       </div>
       <Tabs label="Chiều xem" className="px-2 border-b border-border-subtle" value={dim} onChange={(d) => { setDim(d); setOpen(new Set()); }} items={DIMENSIONS} />
@@ -117,7 +121,8 @@ function Coverage({ coverage, dim, setDim }) {
   );
 }
 
-const KIND = { BIAS: ['Lệch chuẩn', 'balance'], DEVICE_FRAUD: ['Nghi gian lận thiết bị', 'phonelink_lock'] };
+// Cảnh báo bất thường gồm hai nguồn: lệch chuẩn AI (Giám sát AI) và nghi giả mạo (Sự cố an ninh).
+const KIND = { BIAS: ['Lệch chuẩn AI', 'balance', 'secondary'], SPOOF: ['Nghi giả mạo', 'phonelink_lock', 'status-rejected'] };
 
 const DashboardSkeleton = () => (
   <>
@@ -181,8 +186,10 @@ const DashboardSkeleton = () => (
   </>
 );
 
+const H = 3600 * 1000;
+
 export default function Dashboard() {
-  const { data } = useApp();
+  const { data, can } = useApp();
   const { scope, unitLabel } = useScope();
   // Giữ ở đây để chiều xem không mất khi đổi đơn vị làm bảng tải lại.
   const [dim, setDim] = useState('faculty');
@@ -191,14 +198,30 @@ export default function Dashboard() {
   const urgent = pending.filter((r) => slaState(r.sla_due) !== 'ok');
   const offline = DEVICES.filter((d) => !d.online);
   const sourceErr = data.sources.filter((s) => s.status === 'ERROR');
-  const { backlog: bl, consentStats: cs, anomalies } = data;
-  const totalAll = data.coverage.faculty.reduce((n, f) => n + f.total, 0) + data.coverage.staff.reduce((n, r) => n + r[1], 0) + data.coverage.contractor.reduce((n, r) => n + r[1], 0) + data.coverage.dorm.reduce((n, r) => n + r[1], 0);
-  const collectedAll = data.coverage.faculty.reduce((n, f) => n + f.collected, 0) + data.coverage.staff.reduce((n, r) => n + r[2], 0) + data.coverage.contractor.reduce((n, r) => n + r[2], 0) + data.coverage.dorm.reduce((n, r) => n + r[2], 0);
+  const { backlog: bl, consentStats: cs } = data;
+  const link = (perm, to) => (can(perm) ? to : undefined);
+  const anomalies = [
+    ...data.incidents.filter((e) => e.category === 'SPOOF' && e.state !== 'closed').map((e) => ({ id: e.id, kind: 'SPOOF', high: e.level === 'critical', title: e.title, detail: e.detail, ref: e.cam, to: link('security', `/soc?loai=SPOOF`) })),
+    ...data.anomalies.filter((a) => a.status !== 'RESOLVED').map((a) => ({ id: a.id, kind: 'BIAS', high: a.severity === 'HIGH', title: a.title, detail: a.detail, ref: a.ref, to: '/giam-sat-ai' })),
+  ];
+  const incidentsOpen = data.incidents.filter((e) => e.state === 'open' && e.level === 'critical');
+  const casesOpen = data.attendanceCases.filter((c) => c.status === 'open');
+  // Mọi nhóm trong bảng phủ cộng lại đúng bằng tổng của thống kê đồng ý.
+  const cov = data.coverage;
+  const flat = [...cov.faculty.map((f) => [f.name, f.total, f.collected]), ...cov.staff, ...cov.contractor, ...cov.dorm, ...cov.guest];
+  const totalAll = flat.reduce((n, r) => n + r[1], 0);
+  const collectedAll = flat.reduce((n, r) => n + r[2], 0);
+  // Hàng chờ đọc thẳng từ Hộp yêu cầu để bấm vào thấy đúng con số.
+  const pendingOfType = (t) => pending.filter((r) => r.request_type === t);
+  const rescan = pendingOfType('RESCAN');
+  const rescanOver = rescan.filter((r) => slaState(r.sla_due) === 'over').length;
+  const rescanOldest = rescan.length ? Math.round((Date.now() - Math.min(...rescan.map((r) => new Date(r.submitted_at)))) / H) : 0;
   const autoRate = (bl.auto_approved_7d / (bl.auto_approved_7d + bl.manual_approved_7d)) * 100;
 
   const attention = [
-    ...SOC_EVENTS.filter((e) => e.state === 'open' && e.level === 'critical').map((e) => ({ key: e.id, level: 'critical', title: e.title, meta: `${e.place} • ${e.cam}`, when: e.time, to: '/soc' })),
-    ...anomalies.filter((a) => a.severity === 'HIGH').map((a) => ({ key: a.id, level: 'critical', title: a.title, meta: `${KIND[a.kind][0]} • ${a.ref}`, when: 'Đang mở', to: '/nhat-ky' })),
+    ...incidentsOpen.map((e) => ({ key: e.id, level: 'critical', title: e.title, meta: `${e.place} • ${e.cam}`, when: e.time, to: link('security', `/soc?loai=${e.category}`) })),
+    ...data.anomalies.filter((a) => a.status !== 'RESOLVED' && a.severity === 'HIGH').map((a) => ({ key: a.id, level: 'critical', title: a.title, meta: `${KIND.BIAS[0]} • ${a.ref}`, when: 'Đang mở', to: '/giam-sat-ai' })),
+    ...casesOpen.map((c) => ({ key: c.id, level: 'warning', title: c.title, meta: c.session, when: c.time, to: '/thoi-khoa-bieu?view=cases' })),
     ...urgent.map((r) => ({ key: r.request_id, level: 'warning', title: `${REQUEST_TYPE[r.request_type].label}: ${subjectOf(r).name}`, meta: `${r.request_id} • ${subjectOf(r).code}`, when: slaState(r.sla_due) === 'over' ? 'Quá hạn' : fmtRelative(r.sla_due), to: `/yeu-cau?id=${r.request_id}` })),
     ...sourceErr.map((s) => ({ key: s.id, level: 'warning', title: `${s.name} không đồng bộ được`, meta: s.note, when: fmtRelative(s.last_sync), to: '/tich-hop' })),
     ...offline.map((d) => ({ key: d.id, level: 'warning', title: `${d.id} mất kết nối`, meta: `Phòng ${d.room} • ${d.ip}`, when: 'Ngoại tuyến', to: '/thiet-bi' })),
@@ -206,15 +229,14 @@ export default function Dashboard() {
 
   return (
     <div>
-      <PageHeader title="Tổng quan" desc={`Phạm vi: ${scope.tenant} • ${unitLabel}`}
-        actions={<Link to="/kiosk" className="btn-outline"><Icon name="photo_camera_front" />Mở Kiosk trạm chụp</Link>} />
+      <PageHeader title="Tổng quan" desc={`Phạm vi: ${scope.tenant} • ${unitLabel}`} />
 
       <DataBoundary name={`dashboard:${scope.unit}`} label="số liệu tổng quan" scopeNote="units" skeleton={<DashboardSkeleton />} reveal={false}>
         <MetricStrip className="anim-fade mb-space-md" items={[
-          { label: 'Tỷ lệ phủ Face ID', value: fmtPercent((collectedAll / totalAll) * 100), sub: `${fmtNumber(totalAll - collectedAll)} người chưa thu thập`, to: '/ho-so' },
-          { label: 'Đã đồng ý theo điều khoản hiện hành', value: fmtPercent((cs.active_current / cs.total) * 100), sub: `${fmtNumber(cs.active_old)} người còn ở điều khoản cũ • ${fmtNumber(cs.pending)} chưa xác nhận`, alert: true, to: '/dong-y' },
-          { label: 'Yêu cầu chụp lại tồn đọng', value: fmtNumber(bl.rescan_open), sub: `Lâu nhất ${bl.rescan_oldest_hours} giờ • ${bl.over_sla} quá hạn`, alert: bl.over_sla > 0, to: '/yeu-cau' },
-          { label: 'AI tự duyệt (7 ngày)', value: fmtPercent(autoRate), sub: `${fmtNumber(bl.auto_approved_7d)} tự duyệt • ${fmtNumber(bl.manual_approved_7d)} người duyệt`, to: '/nhat-ky' },
+          { label: 'Tỷ lệ phủ Face ID', value: fmtPercent((collectedAll / totalAll) * 100), sub: `${fmtNumber(totalAll - collectedAll)} / ${fmtNumber(totalAll)} người chưa thu thập`, to: '/ho-so?nhom=not_collected' },
+          { label: 'Đồng ý điều khoản hiện hành v1.2', value: fmtPercent((cs.active_current / cs.total) * 100), sub: `${fmtNumber(cs.active_old)} người còn ở điều khoản cũ • ${fmtNumber(cs.pending)} chưa xác nhận`, alert: true, to: link('consent', '/dong-y') },
+          { label: 'Yêu cầu chụp lại chờ duyệt', value: fmtNumber(rescan.length), sub: rescan.length ? `Lâu nhất ${rescanOldest} giờ • ${rescanOver} quá hạn` : 'Không có yêu cầu tồn đọng', alert: rescanOver > 0, to: '/yeu-cau?loai=RESCAN' },
+          { label: 'AI tự duyệt (7 ngày)', value: fmtPercent(autoRate), sub: `${fmtNumber(bl.auto_approved_7d)} tự duyệt • ${fmtNumber(bl.manual_approved_7d)} người duyệt`, to: '/giam-sat-ai' },
         ]} />
 
         <div className="reveal grid grid-cols-12 gap-space-md items-start">
@@ -224,32 +246,39 @@ export default function Dashboard() {
             <section className="card overflow-hidden">
               <div className="flex items-center justify-between h-12 px-space-md">
                 <h2 className="text-headline-md">Cảnh báo bất thường</h2>
-                <Link to="/nhat-ky" className="text-label-sm text-primary-container hover:underline">Kiểm toán</Link>
+                <Link to="/giam-sat-ai" className="text-label-sm text-primary-container hover:underline">Giám sát AI</Link>
               </div>
               <ul className="divide-y divide-border-subtle border-t border-border-subtle">
-                {anomalies.map((a) => (
-                  <li key={a.id} className="px-space-md py-2.5 flex gap-2.5">
-                    <Icon name={KIND[a.kind][1]} size={18} className={a.severity === 'HIGH' ? 'text-status-rejected mt-0.5' : 'text-status-pending mt-0.5'} />
-                    <div className="min-w-0">
-                      <div className="text-label-md font-semibold">{a.title}</div>
-                      <div className="text-caption text-text-secondary">{a.detail}</div>
-                      <div className="mt-1 flex gap-1.5"><Chip color={a.kind === 'BIAS' ? 'secondary' : 'status-rejected'}>{KIND[a.kind][0]}</Chip><span className="font-mono text-caption text-text-secondary">{a.ref}</span></div>
-                    </div>
-                  </li>
-                ))}
+                {anomalies.length === 0 && <li className="px-space-md py-3 text-body-sm text-text-secondary">Không có cảnh báo đang mở.</li>}
+                {anomalies.map((a) => {
+                  const Row = a.to ? Link : 'div';
+                  return (
+                    <li key={a.id}>
+                      <Row to={a.to} className={`px-space-md py-2.5 flex gap-2.5 ${a.to ? 'hover:bg-surface-container-low' : ''}`}>
+                        <Icon name={KIND[a.kind][1]} size={18} className={a.high ? 'text-status-rejected mt-0.5' : 'text-status-pending mt-0.5'} />
+                        <div className="min-w-0">
+                          <div className="text-label-md font-semibold">{a.title}</div>
+                          <div className="text-caption text-text-secondary">{a.detail}</div>
+                          <div className="mt-1 flex items-center gap-1.5"><Chip color={KIND[a.kind][2]}>{KIND[a.kind][0]}</Chip><span className="font-mono text-caption text-text-secondary">{a.ref}</span></div>
+                        </div>
+                      </Row>
+                    </li>
+                  );
+                })}
               </ul>
             </section>
             <section className="card p-space-md">
               <h2 className="text-headline-md mb-2">Hàng chờ</h2>
               <dl className="grid grid-cols-2 gap-2 text-body-sm">
                 {[
-                  ['Chờ duyệt (mẫu)', pending.length, '/yeu-cau'],
-                  ['Đăng ký mới chờ duyệt', fmtNumber(bl.new_registration_open), '/yeu-cau'],
-                  ['Chụp lại quá hạn', bl.over_sla, '/yeu-cau'],
-                  ['Chờ xóa dữ liệu', data.erasures.filter((e) => e.status !== 'DONE').length, '/dong-y'],
-                ].map(([l, v, to]) => (
-                  <Link key={l} to={to} className="p-2.5 rounded bg-surface-container-low hover:bg-surface-container"><dt className="text-caption text-text-secondary">{l}</dt><dd className="text-k-title-md tabular-nums">{v}</dd></Link>
-                ))}
+                  ['Tất cả chờ duyệt', pending.length, '/yeu-cau'],
+                  ['Đăng ký mới chờ duyệt', pendingOfType('NEW_REGISTRATION').length, '/yeu-cau?loai=NEW_REGISTRATION'],
+                  ['Rút đồng ý chờ xác nhận', pendingOfType('WITHDRAW_CONSENT').length, '/yeu-cau?loai=WITHDRAW_CONSENT'],
+                  ['Chờ xóa dữ liệu', data.erasures.filter((e) => e.status !== 'DONE').length, link('consent', '/dong-y')],
+                ].map(([l, v, to]) => {
+                  const Cell = to ? Link : 'div';
+                  return <Cell key={l} to={to} className={`p-2.5 rounded bg-surface-container-low ${to ? 'hover:bg-surface-container' : ''}`}><dt className="text-caption text-text-secondary">{l}</dt><dd className="text-k-title-md tabular-nums">{v}</dd></Cell>;
+                })}
               </dl>
             </section>
           </div>
@@ -257,12 +286,13 @@ export default function Dashboard() {
           <section className="col-span-12 card overflow-hidden">
             <div className="flex items-center justify-between h-12 px-space-md">
               <h2 className="text-headline-md">Cần xử lý <span className="ml-1 font-normal text-text-secondary tabular-nums">{attention.length}</span></h2>
-              <Link to="/soc" className="text-label-sm text-primary-container hover:underline">Trang An ninh</Link>
+              {can('security') && <Link to="/soc" className="text-label-sm text-primary-container hover:underline">Sự cố an ninh</Link>}
             </div>
             <AttentionList items={attention} />
           </section>
         </div>
       </DataBoundary>
+
     </div>
   );
 }

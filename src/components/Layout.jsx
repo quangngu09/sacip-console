@@ -14,7 +14,7 @@ const NAV = [
     { to: '/', icon: 'dashboard', label: 'Tổng quan', end: true, perm: 'view' },
     { to: '/ho-so', icon: 'face', label: 'Hồ sơ định danh', perm: 'view' },
     { to: '/yeu-cau', icon: 'move_to_inbox', label: 'Hộp yêu cầu', badge: 'requests', perm: 'view' },
-    { to: '/dong-y', icon: 'verified_user', label: 'Đồng ý & bảo mật', perm: 'consent' },
+    { to: '/dong-y', icon: 'verified_user', label: 'Bảo vệ dữ liệu cá nhân', perm: 'consent' },
   ]},
   { group: 'Cấu hình', items: [
     { to: '/chinh-sach', icon: 'policy', label: 'Chính sách & quy tắc', perm: 'view' },
@@ -25,9 +25,10 @@ const NAV = [
     { to: '/thoi-khoa-bieu', icon: 'calendar_month', label: 'Lịch học & điểm danh', perm: 'view' },
   ]},
   { group: 'Giám sát', items: [
-    { to: '/soc', icon: 'shield_lock', label: 'An ninh & ngoại lệ', badge: 'soc', perm: 'security' },
+    { to: '/soc', icon: 'shield_lock', label: 'Sự cố an ninh', badge: 'soc', perm: 'security' },
+    { to: '/di-lai', icon: 'route', label: 'Lượt ra vào khu vực', perm: 'movement' },
     { to: '/giam-sat-ai', icon: 'smart_toy', label: 'Giám sát AI', perm: 'view' },
-    { to: '/nhat-ky', icon: 'receipt_long', label: 'Kiểm toán & báo cáo', perm: 'audit' },
+    { to: '/nhat-ky', icon: 'receipt_long', label: 'Nhật ký truy vết', perm: 'audit' },
   ]},
 ];
 
@@ -35,6 +36,7 @@ function Sidebar() {
   const { requests, data, railCollapsed: collapsed, toggleRail, can } = useApp();
   const pending = requests.filter((r) => r.status === 'pending').length;
   const sourceIssue = data.sources.some((x) => x.status === 'ERROR');
+  const socOpen = data.incidents.some((e) => e.state === 'open' && e.level === 'critical');
   const groups = NAV.map((g) => ({ ...g, items: g.items.filter((it) => can(it.perm) || can('*')) })).filter((g) => g.items.length);
   const shape = `relative flex items-center h-9 rounded text-label-md transition-colors focus-visible:outline-white ${collapsed ? 'justify-center' : 'gap-2.5 px-2.5'}`;
   const toggleLabel = collapsed ? 'Mở rộng menu' : 'Thu gọn menu';
@@ -63,16 +65,11 @@ function Sidebar() {
                 <span className={collapsed ? 'sr-only' : 'truncate'}>{it.label}</span>
                 {it.badge === 'requests' && pending > 0 && <span className={`${collapsed ? 'absolute top-0 right-0.5 min-w-[16px] h-4 px-0.5' : 'ml-auto min-w-[20px] h-5 px-1'} rounded bg-accent text-on-accent text-caption font-semibold flex items-center justify-center`} aria-label={`${pending} yêu cầu chờ duyệt`}>{pending}</span>}
                 {it.badge === 'sources' && sourceIssue && <span className={`${collapsed ? 'absolute top-1.5 right-2' : 'ml-auto'} w-2 h-2 rounded-full bg-rail-alert`} role="img" aria-label="Có nguồn dữ liệu lỗi đồng bộ" />}
-                {it.badge === 'soc' && <span className={`${collapsed ? 'absolute top-1.5 right-2' : 'ml-auto'} w-2 h-2 rounded-full bg-rail-alert`} role="img" aria-label="Có sự kiện chưa xử lý" />}
+                {it.badge === 'soc' && socOpen && <span className={`${collapsed ? 'absolute top-1.5 right-2' : 'ml-auto'} w-2 h-2 rounded-full bg-rail-alert`} role="img" aria-label="Có sự cố nghiêm trọng chưa tiếp nhận" />}
               </NavLink>
             ))}
           </div>
         ))}
-        <div className="border-t border-rail-line pt-2">
-          <NavLink to="/kiosk" title={collapsed ? 'Mở Kiosk trạm chụp' : undefined} className={`${shape} text-rail-text hover:bg-rail-hover hover:text-white`}>
-            <Icon name="photo_camera_front" size={18} /><span className={collapsed ? 'sr-only' : 'whitespace-nowrap'}>Mở Kiosk trạm chụp</span>{!collapsed && <Icon name="open_in_new" size={14} className="ml-auto" />}
-          </NavLink>
-        </div>
       </nav>
       <div className="px-space-sm pt-2 border-t border-rail-line">
         <button type="button" onClick={toggleRail} aria-expanded={!collapsed} title={collapsed ? toggleLabel : undefined} className={`${shape} w-full text-rail-text hover:bg-rail-hover hover:text-white`}>
@@ -111,7 +108,7 @@ function Notifications({ onClose }) {
         <button className="text-caption text-primary-container hover:underline" onClick={() => setNotifications((ns) => ns.map((n) => ({ ...n, unread: false })))}>Đánh dấu đã đọc tất cả</button>
       </div>
       <div className="flex gap-1 px-3 py-1.5 border-b border-border-subtle bg-surface-bright text-caption">
-        {[['unread', `Chưa đọc (${unread})`], ['all', 'Tất cả'], ['alert', 'Kiểm toán & Cảnh báo']].map(([k, l]) => (
+        {[['unread', `Chưa đọc (${unread})`], ['all', 'Tất cả'], ['alert', 'Cảnh báo']].map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)} className={`px-2.5 py-1 rounded ${tab === k ? 'bg-surface font-medium shadow-soft border border-border-subtle' : 'text-text-secondary hover:text-text-primary'}`}>{l}</button>
         ))}
       </div>
@@ -164,7 +161,7 @@ function TopBar() {
       <div className="ml-auto flex items-center gap-space-md shrink-0">
         {onDashboard && (
           <>
-            <span className="hidden 2xl:inline text-caption text-text-secondary whitespace-nowrap">Kiểm toán: Ghi nhật ký đầy đủ</span>
+            <span className="hidden 2xl:inline text-caption text-text-secondary whitespace-nowrap">Truy vết: ghi nhật ký đầy đủ</span>
             <div className="relative" ref={ref}>
               <button className="relative p-1 rounded-lg text-text-secondary hover:bg-surface-container-low" onClick={() => setOpen((o) => !o)} aria-label="Thông báo">
                 <Icon name="notifications" size={22} />

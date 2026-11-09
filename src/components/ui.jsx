@@ -5,6 +5,7 @@ import { useApp } from '../store';
 import { useResource } from '../lib/resource';
 import { useScope } from '../lib/scope';
 import { SOURCE, SUBJECT_TYPE, stateMeta } from '../api/enums';
+import { PAGE_HELP } from '../lib/pageHelp';
 
 export const Icon = ({ name, size = 18, className = '', fill = false }) => (
   <span className={`ms ${className}`} style={{ fontSize: size, fontVariationSettings: fill ? "'FILL' 1" : undefined }} aria-hidden>
@@ -255,7 +256,7 @@ export function Drawer({ open, onClose, children, width = 480 }) {
 }
 
 /** Modal xác nhận có trường lý do bắt buộc — mọi thao tác nhạy cảm đều ghi log. */
-export function ConfirmReason({ open, onClose, onConfirm, title, subtitle, danger, confirmLabel = 'Xác nhận', children, minLength = 10, reasonLabel = 'Lý do / Ghi chú kiểm toán', placeholder = 'Nhập căn cứ cho thao tác này…' }) {
+export function ConfirmReason({ open, onClose, onConfirm, title, subtitle, danger, confirmLabel = 'Xác nhận', children, minLength = 10, reasonLabel = 'Lý do (ghi vào nhật ký truy vết)', placeholder = 'Nhập căn cứ cho thao tác này…' }) {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (open) { setReason(''); setBusy(false); } }, [open]);
@@ -319,10 +320,57 @@ export const AiCard = ({ children, className = '' }) => (
   </div>
 );
 
+/** Nút (!) cạnh tiêu đề trang: bấm để xem trang dùng làm gì và cách dùng nhanh (nội dung ở lib/pageHelp.js). */
+function PageHelp({ title }) {
+  const help = PAGE_HELP[title];
+  const [open, setOpen] = useState(false);
+  const wrap = useRef(null);
+  const panelId = useId();
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => { if (wrap.current && !wrap.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+  if (!help) return null;
+  return (
+    <div ref={wrap} className="relative">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls={panelId} aria-label={`Trang "${title}" dùng để làm gì?`} title="Trang này dùng để làm gì?"
+        className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${open ? 'bg-primary-fixed text-primary-container' : 'text-text-secondary hover:bg-surface-container-low hover:text-primary-container'}`}>
+        <Icon name="error" size={20} />
+      </button>
+      {open && (
+        <div id={panelId} role="dialog" aria-label={`Hướng dẫn: ${title}`} className="absolute left-0 top-9 z-50 w-[420px] max-w-[calc(100vw-32px)] bg-surface rounded-lg shadow-xl border border-border-subtle p-space-md flex flex-col gap-2.5 anim-fade">
+          <div className="flex items-start justify-between gap-2">
+            <h2 className="text-label-md font-semibold">{title} dùng để làm gì?</h2>
+            <button type="button" aria-label="Đóng hướng dẫn" className="w-6 h-6 -mt-0.5 rounded flex items-center justify-center text-text-secondary hover:bg-surface-container-low shrink-0" onClick={() => setOpen(false)}><Icon name="close" size={16} /></button>
+          </div>
+          <p className="text-body-sm">{help.purpose}</p>
+          {help.who && <p className="text-caption text-text-secondary"><b className="font-semibold text-text-primary">Ai dùng:</b> {help.who}</p>}
+          <div>
+            <div className="text-caption font-semibold mb-1">Cách dùng nhanh</div>
+            <ol className="flex flex-col gap-1.5">
+              {help.steps.map((s, i) => (
+                <li key={s} className="flex gap-2 text-body-sm">
+                  <span className="w-5 h-5 rounded-full bg-primary-fixed text-primary-container text-caption font-semibold flex items-center justify-center shrink-0">{i + 1}</span>
+                  <span>{s}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+          {help.note && <p className="text-caption p-2 rounded bg-status-pending/10 flex items-start gap-1.5"><Icon name="lightbulb" size={14} className="mt-0.5 text-status-pending" />{help.note}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const PageHeader = ({ title, badge, desc, actions }) => (
   <div className="flex items-center justify-between gap-4 mb-space-md">
     <div className="min-w-0">
-      <div className="flex items-center gap-2"><h1 className="text-headline-lg">{title}</h1>{badge}</div>
+      <div className="flex items-center gap-1.5"><h1 className="text-headline-lg">{title}</h1><PageHelp title={title} />{badge}</div>
       {desc && <p className="text-caption text-text-secondary truncate">{desc}</p>}
     </div>
     {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
